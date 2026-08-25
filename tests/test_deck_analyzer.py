@@ -3,6 +3,7 @@
 import pytest
 from app.models import Card
 from app.analysis.deck_analyzer import DeckAnalyzer
+from app.analysis.issue_codes import IssueCode
 
 
 @pytest.fixture
@@ -102,31 +103,81 @@ class TestArchetypeClassification:
 
 class TestCardRoles:
     """Test card role classification."""
-    
+
     def test_card_role_hog_rider(self):
         """Test Hog Rider is win condition."""
-        role = DeckAnalyzer.get_card_role("Hog Rider")
-        assert role == "win_condition"
-    
+        roles = DeckAnalyzer.get_card_roles("Hog Rider")
+        assert roles == {"win_condition"}
+
     def test_card_role_spell(self):
         """Test Fireball is spell."""
-        role = DeckAnalyzer.get_card_role("Fireball")
-        assert role == "spell"
-    
+        roles = DeckAnalyzer.get_card_roles("Fireball")
+        assert roles == {"spell"}
+
     def test_card_role_tank(self):
         """Test Golem is tank."""
-        role = DeckAnalyzer.get_card_role("Golem")
-        assert role == "tank"
-    
+        roles = DeckAnalyzer.get_card_roles("Golem")
+        assert roles == {"tank"}
+
     def test_card_role_anti_air(self):
-        """Test Inferno Dragon is anti-air."""
-        role = DeckAnalyzer.get_card_role("Inferno Dragon")
-        assert role in ["anti_air", "win_condition"]  # Can be both
-    
+        """Test Inferno Dragon is both anti-air and a win condition."""
+        roles = DeckAnalyzer.get_card_roles("Inferno Dragon")
+        assert "anti_air" in roles
+        assert "win_condition" in roles
+
     def test_card_role_unknown(self):
         """Test unknown card role."""
-        role = DeckAnalyzer.get_card_role("Unknown Card")
-        assert role == "unknown"
+        roles = DeckAnalyzer.get_card_roles("Unknown Card")
+        assert roles == frozenset()
+        assert DeckAnalyzer.get_primary_role("Unknown Card") == "unknown"
+
+    # Regression tests: these card names previously appeared as duplicate
+    # dict keys in CARD_ROLES, so only the last assignment silently survived.
+    def test_card_role_royal_giant_is_tank_and_win_condition(self):
+        roles = DeckAnalyzer.get_card_roles("Royal Giant")
+        assert "tank" in roles
+        assert "win_condition" in roles
+
+    def test_card_role_musketeer_is_anti_air_and_support(self):
+        roles = DeckAnalyzer.get_card_roles("Musketeer")
+        assert "anti_air" in roles
+        assert "support" in roles
+
+    def test_card_role_archers_is_anti_air_and_support(self):
+        roles = DeckAnalyzer.get_card_roles("Archers")
+        assert "anti_air" in roles
+        assert "support" in roles
+
+    def test_card_role_mega_minion_is_anti_air_and_support(self):
+        roles = DeckAnalyzer.get_card_roles("Mega Minion")
+        assert "anti_air" in roles
+        assert "support" in roles
+
+    def test_card_role_cannon_is_building(self):
+        roles = DeckAnalyzer.get_card_roles("Cannon")
+        assert roles == {"building"}
+
+    def test_card_role_tesla_is_building_and_anti_air(self):
+        roles = DeckAnalyzer.get_card_roles("Tesla")
+        assert "building" in roles
+        assert "anti_air" in roles
+
+    def test_card_role_inferno_tower_is_building_and_anti_air(self):
+        roles = DeckAnalyzer.get_card_roles("Inferno Tower")
+        assert "building" in roles
+        assert "anti_air" in roles
+
+    def test_card_role_mirror_is_spell(self):
+        roles = DeckAnalyzer.get_card_roles("Mirror")
+        assert roles == {"spell"}
+
+    def test_card_role_pekka_is_tank_and_win_condition(self):
+        roles = DeckAnalyzer.get_card_roles("P.E.K.K.A")
+        assert "tank" in roles
+        assert "win_condition" in roles
+
+    def test_get_primary_role_prioritizes_tank_over_win_condition(self):
+        assert DeckAnalyzer.get_primary_role("Royal Giant") == "tank"
 
 
 class TestDeckFlags:
@@ -145,20 +196,19 @@ class TestDeckFlags:
             Card(id=8, name="Goblins", elixir=2, rarity="Common", type="troop"),
         ]
         issues, _ = DeckAnalyzer.check_deck_flags(no_spell_deck)
-        # Should not have spell issue since Zap is there
-        assert not any("Sem feitico" in issue for issue in issues)
-    
+        # Should not have the missing-spell issue since Zap is there
+        assert not any(i.code == IssueCode.MISSING_SPELL.value for i in issues)
+
     def test_flags_high_elixir(self, high_elixir_deck):
         """Test detection of high elixir cost."""
         issues, _ = DeckAnalyzer.check_deck_flags(high_elixir_deck)
-        assert any("Elixir muito alto" in issue for issue in issues)
-    
+        assert any(i.code == IssueCode.ELIXIR_TOO_HIGH.value for i in issues)
+
     def test_flags_low_elixir(self, low_elixir_deck):
         """Test detection of low elixir cost."""
         issues, _ = DeckAnalyzer.check_deck_flags(low_elixir_deck)
         # Low elixir typically isn't flagged as an issue
-        high_elixir_issues = [i for i in issues if "Elixir muito" in i]
-        assert len(high_elixir_issues) == 0 or "High" not in high_elixir_issues[0]
+        assert not any(i.code == IssueCode.ELIXIR_TOO_HIGH.value for i in issues)
     
     def test_flags_strength_balanced(self, sample_cards):
         """Test detection of balanced deck strengths."""

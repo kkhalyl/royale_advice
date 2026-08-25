@@ -24,7 +24,7 @@ async def _get_enriched_deck(player_data: dict, client) -> list[Card]:
         card_name = card_data.get("name", db_card.get("name", "Unknown"))
         
         # Derive type from role since Supercell API doesn't include type field
-        role = DeckAnalyzer.get_card_role(card_name)
+        role = DeckAnalyzer.get_primary_role(card_name)
         if role == "spell":
             card_type = "spell"
         elif role == "building":

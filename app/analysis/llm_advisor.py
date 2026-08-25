@@ -1,77 +1,15 @@
 """Optional LLM-powered advice generation (feature-flagged with OpenRouter)."""
 
 import logging
-from typing import Optional
+from typing import List, Optional
 from app.config import settings
 from app.models import DeckAnalysis
 
 logger = logging.getLogger(__name__)
 
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-async def generate_llm_summary(
-    player_name: str,
-    trophies: int,
-    analysis: DeckAnalysis,
-    suggested_swaps: list,
-) -> Optional[str]:
-    """
-    Generate LLM-powered advice summary using OpenRouter (feature-flagged).
-    
-    If OPENROUTER_API_KEY is not set, returns None gracefully.
-    If API call fails, logs warning and returns None (does not crash).
-    
-    Uses primary model (nvidia/nemotron-3-ultra-550b-a55b:free) with fallback
-    to google/gemma-4-26b-a4b-it:free if needed.
-    
-    Args:
-        player_name: Player name
-        trophies: Current trophy count
-        analysis: DeckAnalysis object
-        suggested_swaps: List of suggested card swaps
-    
-    Returns:
-        Optional LLM summary string, or None if feature disabled/failed
-    """
-    
-    # Feature flag: only run if OPENROUTER_API_KEY is set
-    if not settings.openrouter_api_key:
-        logger.debug("OpenRouter API key not configured; skipping LLM summary generation.")
-        return None
-    
-    try:
-        import httpx
-        
-        # Build context prompt
-        issues_text = "\n".join([f"- {issue}" for issue in analysis.flagged_issues])
-        swaps_text = "\n".join([f"- {swap}" for swap in suggested_swaps[:3]])
-        
-        prompt = f"""Jogador: {player_name}
-Troféus: {trophies}
-Arquétipo: {analysis.archetype}
-Elixir Médio: {analysis.avg_elixir}
-Taxa de Vitória: {analysis.win_rate}%
-
-Problemas Encontrados:
-{issues_text}
-
-Sugestões de Melhorias:
-{swaps_text}
-
-Com base nesses dados, dá umas 3-4 dicas práticas e diretas em português pra ajudar esse jogador a melhorar. 
-Fala sobre estratégia, posicionamento, ciclo de cartas e como tirar melhor proveito desse arquétipo. Seja bem específico e coloquial, tipo um coach conversando."""
-
-        headers = {
-            "Authorization": f"Bearer {settings.openrouter_api_key}",
-            "HTTP-Referer": "https://royaladvice.local",
-            "X-Title": "Clash Royale Advice API",
-        }
-
-        payload = {
-            "model": settings.openrouter_primary_model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": """Você é um coach veterano de Clash Royale que já levou vários jogadores pra ligas altas (4000+ troféus). 
+SYSTEM_PROMPT = """Você é um coach veterano de Clash Royale que já levou vários jogadores pra ligas altas (4000+ troféus).
 Seu estilo é descontraído mas direto ao ponto - tipo aquele amigo que manja muito e ajuda o pessoal a subir de troféus.
 
 Quando der conselhos, pensa nessas paradas:
@@ -83,58 +21,133 @@ Quando der conselhos, pensa nessas paradas:
 6. Hora de apertar no ataque vs. hora de segurar
 7. Uso inteligente de feitiços e tropas de suporte
 
-Dá uns conselhos bem práticos e fáceis de aplicar na próxima partida. Nada de teoria vazia, só coisa que funciona mesmo. 
+Dá uns conselhos bem práticos e fáceis de aplicar na próxima partida. Nada de teoria vazia, só coisa que funciona mesmo.
 Usa um tom tranquilo e amigável, como se tivesse batendo um papo."""
-                },
-                {"role": "user", "content": prompt},
-            ],
-            "max_tokens": 700,
-            "temperature": 0.8,
-        }
 
-        async with httpx.AsyncClient(verify=settings.verify_ssl) as client:
-            response = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                json=payload,
-                headers=headers,
-                timeout=30.0,
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                summary = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-                
-                # Cleanup: Remove any errant reasoning or metadata if present
-                if summary:
-                    lines = summary.split("\n")
-                    # Filter out lines that look like internal reasoning or metadata
-                    filtered_lines = [
-                        l for l in lines 
-                        if l.strip() and not any(
-                            l.strip().lower().startswith(prefix)
-                            for prefix in ("jogador:", "troféus:", "análise:", "dados:", "minha", "the user")
-                        )
-                    ]
-                    if filtered_lines:
-                        summary = "\n".join(filtered_lines).strip()
-                
-                if summary:
-                    logger.info(f"Generated LLM summary in Portuguese for {player_name} using OpenRouter.")
-                    return summary
-            else:
-                logger.warning(
-                    f"OpenRouter API returned status {response.status_code}: {response.text}. "
-                    "Falling back to rule-based advice only."
-                )
-                return None
+_META_LINE_PREFIXES = ("jogador:", "troféus:", "análise:", "dados:", "minha", "the user")
 
+
+def _build_user_prompt(
+    player_name: str,
+    trophies: int,
+    analysis: DeckAnalysis,
+    suggested_swaps: List[str],
+) -> str:
+    issues_text = "\n".join(f"- {issue.message}" for issue in analysis.flagged_issues)
+    swaps_text = "\n".join(f"- {swap}" for swap in suggested_swaps[:3])
+
+    return f"""Jogador: {player_name}
+Troféus: {trophies}
+Arquétipo: {analysis.archetype}
+Elixir Médio: {analysis.avg_elixir}
+Taxa de Vitória: {analysis.win_rate}%
+
+Problemas Encontrados:
+{issues_text}
+
+Sugestões de Melhorias:
+{swaps_text}
+
+Com base nesses dados, dá umas 3-4 dicas práticas e diretas em português pra ajudar esse jogador a melhorar.
+Fala sobre estratégia, posicionamento, ciclo de cartas e como tirar melhor proveito desse arquétipo. Seja bem específico e coloquial, tipo um coach conversando."""
+
+
+def _clean_summary(raw: str) -> Optional[str]:
+    """Strip lines that look like echoed metadata/reasoning rather than advice."""
+    raw = raw.strip()
+    if not raw:
+        return None
+
+    lines = raw.split("\n")
+    filtered = [
+        line
+        for line in lines
+        if line.strip() and not line.strip().lower().startswith(_META_LINE_PREFIXES)
+    ]
+    cleaned = "\n".join(filtered).strip()
+    return cleaned or None
+
+
+async def _call_model(client, model: str, messages: list) -> Optional[str]:
+    """Call a single OpenRouter model and return its cleaned text, or None."""
+    response = await client.chat.completions.create(
+        model=model,
+        messages=messages,
+        max_tokens=700,
+        temperature=0.8,
+    )
+    if not response.choices:
+        return None
+    content = response.choices[0].message.content
+    return _clean_summary(content) if content else None
+
+
+async def generate_llm_summary(
+    player_name: str,
+    trophies: int,
+    analysis: DeckAnalysis,
+    suggested_swaps: list,
+) -> Optional[str]:
+    """
+    Generate LLM-powered advice summary using OpenRouter (feature-flagged).
+
+    If OPENROUTER_API_KEY is not set, returns None gracefully.
+    Tries settings.openrouter_primary_model first; if that call fails or
+    returns no usable text, retries once against settings.openrouter_fallback_model
+    before giving up and returning None (never raises to the caller).
+
+    Args:
+        player_name: Player name
+        trophies: Current trophy count
+        analysis: DeckAnalysis object
+        suggested_swaps: List of suggested card swaps
+
+    Returns:
+        Optional LLM summary string, or None if feature disabled/failed
+    """
+    if not settings.openrouter_api_key:
+        logger.debug("OpenRouter API key not configured; skipping LLM summary generation.")
+        return None
+
+    try:
+        from openai import AsyncOpenAI
     except ImportError:
-        logger.warning("httpx library not installed; skipping LLM summary.")
+        logger.warning("openai library not installed; skipping LLM summary.")
         return None
 
-    except Exception as e:
-        logger.warning(
-            f"LLM summary generation failed: {str(e)}. "
-            "Continuing with rule-based advice only."
-        )
-        return None
+    client = AsyncOpenAI(
+        api_key=settings.openrouter_api_key,
+        base_url=OPENROUTER_BASE_URL,
+        default_headers={
+            "HTTP-Referer": "https://royaladvice.local",
+            "X-Title": "Clash Royale Advice API",
+        },
+    )
+
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": _build_user_prompt(player_name, trophies, analysis, suggested_swaps)},
+    ]
+
+    models_to_try = [
+        m for m in (settings.openrouter_primary_model, settings.openrouter_fallback_model) if m
+    ]
+
+    for model in models_to_try:
+        try:
+            summary = await _call_model(client, model, messages)
+        except Exception as e:
+            logger.warning(f"OpenRouter call with model {model} failed: {e}")
+            continue
+
+        if summary:
+            logger.info(f"Generated LLM summary in Portuguese for {player_name} using {model}.")
+            return summary
+
+        logger.warning(f"Model {model} returned no usable summary; trying next option if available.")
+
+    logger.warning(
+        "All configured OpenRouter models failed or returned empty summaries. "
+        "Continuing with rule-based advice only."
+    )
+    return None

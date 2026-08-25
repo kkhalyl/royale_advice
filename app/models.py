@@ -80,6 +80,23 @@ class DeckAnalysis(BaseModel):
     win_rate: float
 
 
+class CardCatalogResponse(BaseModel):
+    """Typed response for GET /cards/."""
+
+    total: int
+    cards: List[Card]
+
+
+class PlayerDeckView(BaseModel):
+    """Typed response for GET /players/{tag}/deck."""
+
+    tag: str
+    name: str
+    cards: List[Card]
+    avg_elixir: float
+    card_count: int
+
+
 class Advice(BaseModel):
     """Complete gameplay advice for a player."""
     model_config = ConfigDict(from_attributes=True)

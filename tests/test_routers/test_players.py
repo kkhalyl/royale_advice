@@ -109,3 +109,23 @@ def test_get_cards_persists_catalog():
     assert response.status_code == 200
     assert response.json()["total"] > 0
     assert len(card_repo.get_all_cards()) == 8
+
+
+def test_get_card_by_id_returns_persisted_card():
+    client.get("/cards/")  # populate catalog first
+    response = client.get("/cards/1")
+    assert response.status_code == 200
+    assert response.json()["name"] == "Hog Rider"
+
+
+def test_get_card_by_id_404_when_missing():
+    response = client.get("/cards/999999")
+    assert response.status_code == 404
+
+
+def test_get_player_stats_returns_battle_stats():
+    response = client.get("/players/2PP/stats")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total_battles"] == 1
+    assert body["wins"] + body["losses"] + body["draws"] == body["total_battles"]

@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException, Query
 from app.clients import get_client, RoyaleAPIError
-from app.models import PlayerSummary, DeckAnalysis, Advice, Card
+from app.models import PlayerSummary, DeckAnalysis, Advice, Card, PlayerDeckView, BattleStats
 from app.analysis.deck_analyzer import DeckAnalyzer
 from app.analysis.advice_engine import AdviceEngine
 from app.analysis.llm_advisor import generate_llm_summary
@@ -127,7 +127,7 @@ async def get_player_battlelog(tag: str, limit: int = Query(20, ge=1, le=100)):
     return battlelog
 
 
-@router.get("/{tag}/deck")
+@router.get("/{tag}/deck", response_model=PlayerDeckView)
 async def get_player_deck(tag: str):
     """
     Get player's current deck with per-card elixir info and avg elixir.
@@ -152,21 +152,59 @@ async def get_player_deck(tag: str):
 
     avg_elixir = DeckAnalyzer.calculate_avg_elixir(deck)
 
-    return {
-        "tag": player_data.get("tag", tag),
-        "name": player_data.get("name", "Unknown"),
-        "cards": [
-            {
-                "name": card.name,
-                "elixir": card.elixir,
-                "rarity": card.rarity,
-                "type": card.type,
-            }
-            for card in deck
-        ],
-        "avg_elixir": avg_elixir,
-        "card_count": len(deck),
-    }
+    return PlayerDeckView(
+        tag=player_data.get("tag", tag),
+        name=player_data.get("name", "Unknown"),
+        cards=deck,
+        avg_elixir=avg_elixir,
+        card_count=len(deck),
+    )
+
+
+@router.get("/{tag}/stats", response_model=BattleStats)
+async def get_player_stats(tag: str, limit: int = Query(20, ge=1, le=100)):
+    """
+    Get player's recent battle statistics (win rate, avg elixir used).
+
+    Args:
+        tag: Player tag (with or without #)
+        limit: Number of recent battles to consider (default 20, max 100)
+
+    Returns:
+        BattleStats summarizing the player's recent battlelog
+    """
+    client = get_client()
+
+    try:
+        battlelog = await client.get_player_battlelog(tag, limit=limit)
+    except RoyaleAPIError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    battle_repo.upsert_battles(client.normalize_tag(tag), battlelog)
+
+    total = len(battlelog)
+    wins = sum(1 for b in battlelog if b.get("result") == "win")
+    losses = sum(1 for b in battlelog if b.get("result") == "loss")
+    draws = total - wins - losses if total else 0
+    win_rate = DeckAnalyzer.calculate_win_rate(battlelog)
+
+    elixir_samples = []
+    for battle in battlelog:
+        team = battle.get("team") or []
+        cards = team[0].get("cards", []) if team else []
+        costs = [c.get("elixirCost") for c in cards if c.get("elixirCost") is not None]
+        if costs:
+            elixir_samples.append(sum(costs) / len(costs))
+    avg_elixir_last_battles = round(sum(elixir_samples) / len(elixir_samples), 1) if elixir_samples else 0.0
+
+    return BattleStats(
+        total_battles=total,
+        wins=wins,
+        losses=losses,
+        draws=draws,
+        win_rate=win_rate,
+        avg_elixir_last_battles=avg_elixir_last_battles,
+    )
 
 
 @router.get("/{tag}/advice", response_model=Advice)

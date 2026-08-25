@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import players, cards
 from app.db.database import init_db
+from app.config import settings
 
 
 @asynccontextmanager
@@ -21,10 +22,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Allow all origins for local development
+# Allows all origins in debug mode (local dev); explicit allowlist otherwise.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

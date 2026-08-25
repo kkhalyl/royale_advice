@@ -4,7 +4,23 @@ import pytest
 from unittest.mock import AsyncMock, patch
 import respx
 import httpx
+from sqlalchemy.pool import StaticPool
+from sqlmodel import SQLModel, create_engine
+
+import app.db.repositories.card_repo as card_repo
 from app.clients.royale_client import RoyaleClient, RoyaleAPIError
+
+
+@pytest.fixture(autouse=True)
+def isolated_db(monkeypatch):
+    """Point card_repo at an isolated in-memory DB so get_cards() never
+    touches the real data/royal_advice.db file during tests."""
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    SQLModel.metadata.create_all(engine)
+    monkeypatch.setattr(card_repo, "engine", engine)
+    return engine
 
 
 @pytest.fixture
@@ -155,7 +171,7 @@ class TestErrorHandling:
 
 class TestCaching:
     """Test card caching mechanism."""
-    
+
     @pytest.mark.asyncio
     async def test_cards_cached(self, client):
         """Test that cards are cached after first fetch."""
@@ -163,16 +179,82 @@ class TestCaching:
             {"id": 1, "name": "Hog Rider", "elixir": 4, "rarity": "Rare"},
             {"id": 2, "name": "Fireball", "elixir": 4, "rarity": "Rare"},
         ]
-        
+
+        with respx.mock:
+            route = respx.get("https://proxy.royaleapi.dev/v1/cards").mock(
+                return_value=httpx.Response(200, json=mock_cards)
+            )
+
+            # First call
+            result1 = await client.get_cards()
+
+            # Second call should use the in-memory cache, not hit the API again
+            result2 = await client.get_cards()
+
+            assert result1 == result2
+            assert route.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_get_cards_persists_to_db(self, client):
+        """Fetching cards should upsert them into the persisted catalog."""
+        mock_cards = [
+            {"id": 26000000, "name": "Knight", "elixirCost": 3, "rarity": "Common"},
+        ]
+
         with respx.mock:
             respx.get("https://proxy.royaleapi.dev/v1/cards").mock(
                 return_value=httpx.Response(200, json=mock_cards)
             )
-            
-            # First call
-            result1 = await client.get_cards()
-            
-            # Second call should use cache
-            result2 = await client.get_cards()
-            
-            assert result1 == result2
+            await client.get_cards()
+
+        persisted = card_repo.get_all_cards()
+        assert len(persisted) == 1
+        assert persisted[0].name == "Knight"
+        assert persisted[0].elixir == 3
+
+    @pytest.mark.asyncio
+    async def test_get_cards_uses_persisted_catalog_when_memory_cache_cold(self, client):
+        """A second RoyaleClient instance (memory cache empty) should read the
+        DB-persisted catalog instead of re-hitting the live API."""
+        mock_cards = [
+            {"id": 26000000, "name": "Knight", "elixirCost": 3, "rarity": "Common"},
+        ]
+
+        with respx.mock:
+            route = respx.get("https://proxy.royaleapi.dev/v1/cards").mock(
+                return_value=httpx.Response(200, json=mock_cards)
+            )
+            await client.get_cards()
+
+            fresh_client = RoyaleClient()
+            fresh_client.api_key = "test-api-key"
+            result = await fresh_client.get_cards()
+
+            assert "knight" in result
+            assert route.call_count == 1  # second client did not re-fetch from the API
+
+
+class TestGetClan:
+    """Test get_clan method."""
+
+    @pytest.mark.asyncio
+    async def test_get_clan_success(self, client):
+        mock_response = {"tag": "#CLAN1", "name": "Test Clan", "members": 40}
+
+        with respx.mock:
+            respx.get("https://proxy.royaleapi.dev/v1/clans/%23CLAN1").mock(
+                return_value=httpx.Response(200, json=mock_response)
+            )
+
+            result = await client.get_clan("#CLAN1")
+            assert result["name"] == "Test Clan"
+
+    @pytest.mark.asyncio
+    async def test_get_clan_not_found(self, client):
+        with respx.mock:
+            respx.get("https://proxy.royaleapi.dev/v1/clans/%23BADCLAN").mock(
+                return_value=httpx.Response(404, json={"error": "Not Found"})
+            )
+
+            with pytest.raises(RoyaleAPIError):
+                await client.get_clan("#BADCLAN")

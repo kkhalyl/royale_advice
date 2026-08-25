@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from urllib.parse import quote
 
 from app.config import settings
+from app.db.repositories import card_repo
 
 
 class RoyaleAPIError(Exception):
@@ -116,55 +117,95 @@ class RoyaleClient:
     async def get_player_battlelog(self, tag: str, limit: int = 20) -> List[Dict]:
         """
         Fetch player's recent battle log.
-        
+
         Args:
             tag: Player tag (with or without #)
             limit: Number of recent battles to fetch (default 20)
-        
+
         Returns:
             List of battle objects (opponent, deck used, result, etc.)
         """
         normalized_tag = self.normalize_tag(tag)
         url_safe = self._url_safe_tag(normalized_tag)
         endpoint = f"/players/{url_safe}/battlelog"
-        
+
         battlelog = await self._request("GET", endpoint)
         return battlelog[:limit] if isinstance(battlelog, list) else []
-    
+
+    async def get_clan(self, tag: str) -> Dict:
+        """
+        Fetch clan profile.
+
+        Args:
+            tag: Clan tag (with or without #)
+
+        Returns:
+            Clan profile dict with name, member list, etc.
+        """
+        normalized_tag = self.normalize_tag(tag)
+        url_safe = self._url_safe_tag(normalized_tag)
+        endpoint = f"/clans/{url_safe}"
+
+        return await self._request("GET", endpoint)
+
     async def get_cards(self) -> Dict[str, Dict]:
         """
-        Fetch all cards (cached for 24 hours).
-        
+        Fetch all cards. Two-tier cache: in-memory (this process, 24h TTL)
+        backed by the persisted card catalog (app/db/repositories/card_repo.py),
+        which survives process restarts. Only hits the live API when both
+        caches are stale.
+
         Returns:
             Dict mapping card ID to card details (name, elixir, rarity, type, etc.)
         """
-        # Check if cache is still valid
+        # Tier 1: in-memory cache for this process.
         now = datetime.now()
         if self._cards_cache is not None and self._cards_cache_time is not None:
             if now - self._cards_cache_time < self._cache_ttl:
                 return self._cards_cache
-        
-        # Fetch fresh data
+
+        # Tier 2: persisted catalog, if not stale.
+        if not card_repo.is_catalog_stale(self._cache_ttl):
+            persisted = card_repo.get_all_cards()
+            if persisted:
+                cards_dict = {}
+                for card in persisted:
+                    cards_dict[str(card.id)] = {
+                        "id": card.id,
+                        "name": card.name,
+                        "elixirCost": card.elixir,
+                        "rarity": card.rarity,
+                        "type": card.type,
+                    }
+                    cards_dict[card.name.lower()] = cards_dict[str(card.id)]
+                self._cards_cache = cards_dict
+                self._cards_cache_time = now
+                return cards_dict
+
+        # Tier 3: fetch fresh data from the live API.
         endpoint = "/cards"
         cards_list = await self._request("GET", endpoint)
-        
+
         # Convert list to dict keyed by card ID or name for easier lookup
         if isinstance(cards_list, dict) and "items" in cards_list:
             cards_list = cards_list["items"]
-        
+
         cards_dict = {}
-        if isinstance(cards_list, list):
-            for card in cards_list:
-                # Key by both ID and name for flexibility
-                if "id" in card:
-                    cards_dict[str(card["id"])] = card
-                if "name" in card:
-                    cards_dict[card["name"].lower()] = card
-        
-        # Update cache
+        raw_cards = cards_list if isinstance(cards_list, list) else []
+        for card in raw_cards:
+            # Key by both ID and name for flexibility
+            if "id" in card:
+                cards_dict[str(card["id"])] = card
+            if "name" in card:
+                cards_dict[card["name"].lower()] = card
+
+        if raw_cards:
+            card_repo.upsert_cards(raw_cards)
+
+        # Update in-memory cache
         self._cards_cache = cards_dict
         self._cards_cache_time = now
-        
+
         return cards_dict
 
 

@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     openrouter_api_key: Optional[str] = None
     openrouter_primary_model: str = "nvidia/nemotron-3-ultra-550b-a55b:free"
     openrouter_fallback_model: str = "google/gemma-4-26b-a4b-it:free"
+    database_url: str = "sqlite:///./data/royal_advice.db"
     debug: bool = False
     verify_ssl: bool = True
 

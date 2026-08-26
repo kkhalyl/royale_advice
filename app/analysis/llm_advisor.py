@@ -2,12 +2,10 @@
 
 import logging
 from typing import List, Optional
-from app.config import settings
-from app.models import DeckAnalysis
+from app.clients.openrouter_client import build_client, try_models
+from app.models import DeckAnalysis, TipDetail
 
 logger = logging.getLogger(__name__)
-
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 SYSTEM_PROMPT = """Você é um coach veterano de Clash Royale que já levou vários jogadores pra ligas altas (4000+ troféus).
 Seu estilo é descontraído mas direto ao ponto - tipo aquele amigo que manja muito e ajuda o pessoal a subir de troféus.
@@ -36,10 +34,10 @@ def _build_user_prompt(
     player_name: str,
     trophies: int,
     analysis: DeckAnalysis,
-    suggested_swaps: List[str],
+    suggested_swaps: List[TipDetail],
 ) -> str:
     issues_text = "\n".join(f"- {issue.message}" for issue in analysis.flagged_issues)
-    swaps_text = "\n".join(f"- {swap}" for swap in suggested_swaps[:3])
+    swaps_text = "\n".join(f"- {swap.text}" for swap in suggested_swaps[:3])
 
     return f"""Jogador: {player_name}
 Troféus: {trophies}
@@ -73,69 +71,11 @@ def _clean_summary(raw: str) -> Optional[str]:
     return cleaned or None
 
 
-def _build_client():
-    """Build an OpenRouter-configured AsyncOpenAI client, or None if unavailable."""
-    if not settings.openrouter_api_key:
-        logger.debug("OpenRouter API key not configured; skipping LLM call.")
-        return None
-
-    try:
-        from openai import AsyncOpenAI
-    except ImportError:
-        logger.warning("openai library not installed; skipping LLM call.")
-        return None
-
-    return AsyncOpenAI(
-        api_key=settings.openrouter_api_key,
-        base_url=OPENROUTER_BASE_URL,
-        default_headers={
-            "HTTP-Referer": "https://royaladvice.local",
-            "X-Title": "Clash Royale Advice API",
-        },
-    )
-
-
-async def _call_model(client, model: str, messages: list) -> Optional[str]:
-    """Call a single OpenRouter model and return its cleaned text, or None."""
-    response = await client.chat.completions.create(
-        model=model,
-        messages=messages,
-        max_tokens=700,
-        temperature=0.8,
-    )
-    if not response.choices:
-        return None
-    content = response.choices[0].message.content
-    return _clean_summary(content) if content else None
-
-
-async def _try_models(client, messages: list) -> Optional[str]:
-    """Try the primary model, then the fallback, returning the first usable result."""
-    models_to_try = [
-        m for m in (settings.openrouter_primary_model, settings.openrouter_fallback_model) if m
-    ]
-
-    for model in models_to_try:
-        try:
-            result = await _call_model(client, model, messages)
-        except Exception as e:
-            logger.warning(f"OpenRouter call with model {model} failed: {e}")
-            continue
-
-        if result:
-            return result
-
-        logger.warning(f"Model {model} returned no usable result; trying next option if available.")
-
-    logger.warning("All configured OpenRouter models failed or returned empty results.")
-    return None
-
-
 async def generate_llm_summary(
     player_name: str,
     trophies: int,
     analysis: DeckAnalysis,
-    suggested_swaps: list,
+    suggested_swaps: List[TipDetail],
 ) -> Optional[str]:
     """
     Generate LLM-powered advice summary using OpenRouter (feature-flagged).
@@ -154,7 +94,7 @@ async def generate_llm_summary(
     Returns:
         Optional LLM summary string, or None if feature disabled/failed
     """
-    client = _build_client()
+    client = build_client()
     if client is None:
         return None
 
@@ -163,7 +103,7 @@ async def generate_llm_summary(
         {"role": "user", "content": _build_user_prompt(player_name, trophies, analysis, suggested_swaps)},
     ]
 
-    summary = await _try_models(client, messages)
+    summary = await try_models(client, messages, transform=_clean_summary, max_tokens=700, temperature=0.8)
     if summary:
         logger.info(f"Generated LLM summary in Portuguese for {player_name}.")
     else:
@@ -212,7 +152,7 @@ async def answer_question(
     Returns:
         Optional answer string, or None if the feature is disabled/failed
     """
-    client = _build_client()
+    client = build_client()
     if client is None:
         return None
 
@@ -221,4 +161,4 @@ async def answer_question(
         {"role": "user", "content": _build_ask_prompt(player_name, deck_card_names, analysis, question)},
     ]
 
-    return await _try_models(client, messages)
+    return await try_models(client, messages, max_tokens=700, temperature=0.8)

@@ -109,6 +109,13 @@ class AskResponse(BaseModel):
     answer: str
 
 
+class TipDetail(BaseModel):
+    """A single piece of advice, tagged by where it came from."""
+
+    text: str
+    source: str  # "rule_based" | "reddit"
+
+
 class Advice(BaseModel):
     """Complete gameplay advice for a player."""
     model_config = ConfigDict(from_attributes=True)
@@ -122,8 +129,8 @@ class Advice(BaseModel):
     analysis: DeckAnalysis
 
     # Structured advice
-    suggested_swaps: List[str]  # Cards to consider swapping
-    general_tips: List[str]  # General gameplay tips
+    suggested_swaps: List[TipDetail]  # Cards to consider swapping
+    general_tips: List[TipDetail]  # General gameplay tips
 
     # Optional LLM summary
     llm_summary: Optional[str] = None

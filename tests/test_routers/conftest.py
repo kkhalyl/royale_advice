@@ -9,6 +9,7 @@ import app.db.database as database
 import app.db.repositories.battle_repo as battle_repo
 import app.db.repositories.card_repo as card_repo
 import app.db.repositories.player_repo as player_repo
+import app.db.repositories.tip_repo as tip_repo
 from app.clients.royale_client import RoyaleClient
 
 
@@ -22,6 +23,7 @@ def isolated_db(monkeypatch):
     monkeypatch.setattr(card_repo, "engine", engine)
     monkeypatch.setattr(player_repo, "engine", engine)
     monkeypatch.setattr(battle_repo, "engine", engine)
+    monkeypatch.setattr(tip_repo, "engine", engine)
     return engine
 
 

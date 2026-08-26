@@ -1,33 +1,28 @@
-# Clash Royale Player Advice API
+# Royal Advice — Clash Royale Player Advice API
 
-A **Python FastAPI backend** that fetches player/deck/battle data from the Clash Royale API via the **RoyaleAPI proxy** and generates **gameplay improvement advice** using rule-based deck analysis plus optional LLM-powered summaries.
+A **Python FastAPI backend** that fetches player/deck/battle data from the Clash Royale API via the **RoyaleAPI proxy**, persists it in SQLite, and generates **gameplay improvement advice** by combining rule-based deck analysis, Reddit-sourced community tips, and an optional LLM-powered summary. A "witch's tavern" React frontend is specced (see `specs/frontend-app/`) but not yet implemented.
 
 ## Features
 
-✅ **Player Profile Lookup** — Fetch player stats, trophies, and current deck  
-✅ **Deck Analysis** — Archetype classification (cycle, beatdown, control, siege)  
-✅ **Rule-Based Advice** — Identify missing cards, elixir curve issues, flagged problems  
-✅ **Win Rate Tracking** — Calculate from recent battles  
-✅ **Gameplay Tips** — General and archetype-specific strategy tips  
-✅ **LLM Summary** — Optional OpenAI-powered personalized coaching (feature-flagged)  
-✅ **Cached Card Data** — 24-hour in-memory TTL for cards reference  
+- **Player Profile Lookup** — Fetch player stats, trophies, king level, clan, and current deck; persisted on every fetch
+- **Deck Analysis** — Archetype classification (cycle, beatdown, control, siege), structured issue/strength codes (not hardcoded strings)
+- **Rule-Based + Reddit-Sourced Advice** — Suggested swaps and tips combine deterministic rules with community tips mined from Reddit (once the ingestion pipeline has run), each tagged with its `source`
+- **Win Rate & Battle Stats** — Computed from persisted battlelog history
+- **Ask the Witch** — A stateless, single-question LLM endpoint (no conversation history)
+- **LLM Summary** — Optional OpenRouter-powered personalized coaching (feature-flagged)
+- **Persisted Card Catalog** — SQLite-backed, refreshed on a TTL (survives restarts, unlike a plain in-memory cache)
 
 ## Quick Start
 
-### 1. Clone & Setup Virtual Environment
+### 1. Set Up a Virtual Environment
 
 ```bash
-# Navigate to project directory
 cd royal-advice
-
-# Create virtual environment
-python -m venv venv
-
-# Activate (Windows)
-.\venv\Scripts\activate
-
-# Activate (Mac/Linux)
-source venv/bin/activate
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# Mac/Linux
+source .venv/bin/activate
 ```
 
 ### 2. Install Dependencies
@@ -36,327 +31,178 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Configure API Keys
+### 3. Configure Environment
 
 ```bash
-# Copy the template
 cp .env.example .env
-
-# Edit .env with your keys
-# ROYALE_API_KEY=<your_key_from_RoyaleAPI>
-# ROYALE_API_BASE=https://proxy.royaleapi.dev/v1
-# (Optional) OPENROUTER_API_KEY=<for_LLM_summaries_via_OpenRouter>
 ```
+
+Edit `.env`:
+- `ROYALE_API_KEY` / `ROYALE_API_BASE` — required, from your RoyaleAPI dashboard
+- `OPENROUTER_API_KEY` (+ `OPENROUTER_PRIMARY_MODEL` / `OPENROUTER_FALLBACK_MODEL`) — optional, enables the LLM summary and the `/ask` endpoint
+- `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` / `REDDIT_USER_AGENT` — optional, only needed to run the Reddit ingestion pipeline (`ingestion/run.py`), not the API server itself
+- `DATABASE_URL` — optional, defaults to `sqlite:///./data/royal_advice.db` (created automatically)
 
 **Important:** You must have added `45.79.218.79` to **ALLOWED IP ADDRESSES** in your RoyaleAPI dashboard before running.
 
-### 4. Run Server
+### 4. Run the Server
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-Server starts at `http://localhost:8000`
+Server starts at `http://localhost:8000`; the SQLite DB is created automatically on startup.
 
-### 5. Explore API
+### 5. Explore the API
 
 Visit **Swagger UI:** http://localhost:8000/docs
 
 ## API Endpoints
 
-### Health Check
+| Endpoint | Description |
+|---|---|
+| `GET /health` | Health check |
+| `GET /players/{tag}` | Player profile + current deck |
+| `GET /players/{tag}/battlelog?limit=20` | Recent battles (persisted on fetch) |
+| `GET /players/{tag}/deck` | Current deck with per-card elixir/rarity/type + avg elixir |
+| `GET /players/{tag}/stats?limit=20` | Win rate + avg elixir used, from recent battles |
+| `GET /players/{tag}/advice?include_llm=true` | Full advice: analysis, suggested swaps, general tips, optional LLM summary |
+| `POST /players/{tag}/ask` | Ask a single free-text question about the player's deck (stateless — no history) |
+| `GET /cards/` | Full persisted card catalog |
+| `GET /cards/{card_id}` | Single card by id |
+
+Every route has a named response model (visible in `/openapi.json`) except `GET /players/{tag}/battlelog`, which passes through the Royale API's raw, uncontrolled battle payload shape.
+
+**Example — full advice:**
 ```bash
-GET /health
+curl "http://localhost:8000/players/2PP/advice"
 ```
-Returns: `{"status": "ok"}`
-
----
-
-### Get Player Profile
-```bash
-GET /players/{tag}
-```
-
-**Example:**
-```bash
-curl -X GET "http://localhost:8000/players/2PP"
-```
-
-**Response:**
 ```json
 {
   "tag": "#2PP",
   "name": "Example Player",
   "trophies": 5500,
-  "best_trophies": 6000,
-  "wins": 1000,
-  "losses": 500,
-  "draws": 50,
-  "current_deck": [...]
-}
-```
-
----
-
-### Get Player Battlelog
-```bash
-GET /players/{tag}/battlelog?limit=20
-```
-
-**Example:**
-```bash
-curl -X GET "http://localhost:8000/players/2PP/battlelog?limit=10"
-```
-
-**Response:** List of recent battles with opponent name, deck, result, etc.
-
----
-
-### Get Player's Deck
-```bash
-GET /players/{tag}/deck
-```
-
-**Example:**
-```bash
-curl -X GET "http://localhost:8000/players/2PP/deck"
-```
-
-**Response:**
-```json
-{
-  "tag": "#2PP",
-  "name": "Example Player",
-  "cards": [
-    {
-      "name": "Hog Rider",
-      "elixir": 4,
-      "rarity": "Rare",
-      "type": "troop"
-    },
-    ...
-  ],
-  "avg_elixir": 3.5,
-  "card_count": 8
-}
-```
-
----
-
-### Get Full Advice (Main Endpoint)
-```bash
-GET /players/{tag}/advice?include_llm=true
-```
-
-**Example:**
-```bash
-curl -X GET "http://localhost:8000/players/2PP/advice"
-```
-
-**Response:**
-```json
-{
-  "tag": "#2PP",
-  "name": "Example Player",
-  "trophies": 5500,
-  "current_deck": ["Hog Rider", "Fireball", "Log", ...],
+  "current_deck": ["Hog Rider", "Fireball", "Zap", "..."],
   "analysis": {
     "archetype": "cycle",
     "avg_elixir": 3.5,
     "card_count": 8,
-    "flagged_issues": ["No air defense", "Missing building"],
-    "strengths": ["Good spell coverage", "Balanced elixir curve"],
+    "flagged_issues": [{"code": "no_air_defense", "message": "Sem defesa aérea - vulnerável a unidades voadoras..."}],
+    "strengths": [{"code": "good_spell_coverage", "message": "Boa cobertura de feitiços..."}],
     "win_rate": 52.5
   },
   "suggested_swaps": [
-    "Add air defense (Inferno Dragon, Hunter, or Electro Dragon) to counter flying units.",
-    "Consider replacing one card with a building for defensive consistency."
+    {"text": "No nivel de rei 13, segure o Cavaleiro antes de mandar o Hog.", "source": "reddit"},
+    {"text": "Adicione defesa aérea (Dragão Infernal, Caçador...).", "source": "rule_based"}
   ],
-  "general_tips": [
-    "Your deck has low elixir cost—cycle fast and apply pressure early.",
-    "Always keep 2-3 cards in hand for defense—don't overcommit to pushes.",
-    "Practice this deck on ladder to familiarize with matchups."
-  ],
-  "llm_summary": "(Optional) Personalized AI-generated coaching tip if OPENAI_API_KEY is set"
+  "general_tips": [{"text": "Seu deck e rapido--cicle bem...", "source": "rule_based"}],
+  "llm_summary": "(optional, present only if OPENROUTER_API_KEY is set)"
 }
 ```
 
----
-
-### Get All Cards
+**Example — ask the witch:**
 ```bash
-GET /cards/
+curl -X POST "http://localhost:8000/players/2PP/ask" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Como eu jogo contra um Giant Beatdown?"}'
 ```
-
-**Response:** All available Clash Royale cards with elixir cost, rarity, type (cached for 24h).
-
----
+```json
+{"answer": "Ahh, o gigante que anda devagar... nao gaste elixir cedo demais..."}
+```
 
 ## Deck Analysis Logic
 
 ### Archetype Classification
-- **Cycle** — avg elixir < 3.5, spell-heavy, fast rotation
-- **Beatdown** — avg elixir 4.0–5.5, high-HP tanks + support
-- **Control** — avg elixir 4.5+, defensive buildings + spells
-- **Siege** — uses building as primary win condition (Mortar, Cannon Cart)
+- **Cycle** — avg elixir < 3.8 with spell presence, or < 3.0 regardless
+- **Beatdown** — avg elixir ≥ 4.2 with a tank
+- **Control** — avg elixir ≥ 4.0
+- **Siege** — has a building, no tank
 
-### Flags Detected
-- ❌ Missing spell
-- ❌ No small spell (Zap/Log)
-- ❌ Missing win condition (Hog, P.E.K.K.A, Balloon, etc.)
-- ❌ No air defense (Inferno Dragon, Hunter, etc.)
-- ❌ High elixir cost (> 4.8) — weak cycling
-- ❌ Low elixir cost (< 2.5) — weak defense
-- ❌ Unbalanced rarity distribution
+### Issue/Strength Codes
+`deck_analyzer.py` emits structured `IssueCode`/`StrengthCode` values (`app/analysis/issue_codes.py`) with params; `app/i18n/strings_pt_br.py` renders them to Portuguese text. This keeps `advice_engine.py`'s matching logic independent of message wording — codes are compared directly, never substring-matched against rendered text.
 
-### Card Role Lookup Table
-Cards are classified by role:
-- **Tank:** Giant, P.E.K.K.A, Golem, Lava Hound
-- **Win Condition:** Hog Rider, Balloon, Goblin Barrel, Royal Giant
-- **Spell:** Fireball, Zap, Log, Poison, Lightning, Rocket, etc.
-- **Support:** Knight, Musketeer, Witch, Wizard, Baby Dragon
-- **Building:** Cannon, Tesla, Inferno Tower, Mortar, Furnace
-- **Anti-Air:** Inferno Dragon, Hunter, Mega Minion, Electro Dragon
+### Card Roles
+`app/analysis/deck_analyzer.py`'s `CARD_ROLES` maps each card name to a **set** of roles (a card can be both a tank and a win condition, e.g. Royal Giant) rather than a single role, so multi-role cards aren't silently misclassified.
 
----
+## Persistence
+
+SQLite via SQLModel (`app/db/`), created automatically at startup (`SQLModel.metadata.create_all()` — no migration tool for a project this size). Entities: `Card` (catalog, TTL-refreshed), `Player`, `DeckSnapshot`, `Battle`, `RedditSource` (raw ingestion audit trail), `AdviceTip` (structured, Reddit-sourced advice). `RoyaleClient.get_cards()` is a three-tier cache: in-memory → DB → live API.
+
+Force a full card catalog refresh independent of a live request:
+```bash
+python -m scripts.seed_cards
+```
+
+## Reddit Ingestion Pipeline
+
+A standalone offline batch job (`ingestion/`) — **not** run by the FastAPI process — that mines `r/ClashRoyale`, `r/ClashRoyaleDecks`, and `r/CompetitiveClashRoyale` for card/archetype/king-level-specific advice, summarizes it with an LLM, and stores it as `AdviceTip` rows that `advice_engine.py` queries and merges with rule-based suggestions.
+
+```bash
+python -m ingestion.run --target cards --limit 15 --max-cards 20   # quick test run
+python -m ingestion.run --target decks
+python -m ingestion.run --target levels
+python -m ingestion.run --target all
+```
+
+Requires `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET` and `OPENROUTER_API_KEY` in `.env`. Re-run periodically (manually, or via Windows Task Scheduler) — tips carry a `stale_after` timestamp so old advice stops being served without needing an active cleanup job.
 
 ## Testing
-
-Run tests with pytest:
 
 ```bash
 pytest
 ```
 
-**Test Coverage:**
-- `tests/test_royale_client.py` — Client mocking (respx), error handling, tag normalization
-- `tests/test_deck_analyzer.py` — Archetype classification, elixir calculation, flags detection
-
-Tests use `respx` to mock HTTP responses — **no live API calls needed**.
-
----
-
-## Optional: LLM-Powered Advice
-
-If you set `OPENROUTER_API_KEY` in `.env`, the `/players/{tag}/advice` endpoint will include a personalized AI-generated coaching tip using OpenRouter's free models (Nemotron-3-Ultra or Gemma-4-26B).
-
-**Example `.env`:**
-```
-OPENROUTER_API_KEY=sk-or-xxx
-OPENROUTER_PRIMARY_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
-OPENROUTER_FALLBACK_MODEL=google/gemma-4-26b-a4b-it:free
-```
-
-**Features:**
-- Feature-flagged: app works fully without it
-- Graceful fallback if API key missing or call fails
-- Uses **free** models (no costs) via OpenRouter
-- 2–3 sentence personalized tip based on player stats, archetype, and flags
-
----
+All tests mock external services — **no live Reddit/RoyaleAPI/OpenRouter calls**, and DB tests use isolated in-memory SQLite (never the real `data/royal_advice.db`). Structure: `tests/test_*.py` for individual modules, `tests/test_db/` for repositories, `tests/test_ingestion/` for the Reddit pipeline, `tests/test_routers/` for endpoint-level tests via `TestClient`.
 
 ## Project Structure
 
 ```
 royal-advice/
-├── requirements.txt               # Dependencies
-├── .env                           # (gitignored) Your API keys
-├── .env.example                   # Template
-├── .gitignore
-├── PLAN.md                        # Implementation plan
-├── README.md                      # This file
-│
+├── requirements.txt
+├── .env.example
 ├── app/
-│   ├── __init__.py
-│   ├── main.py                    # FastAPI app factory + routers
+│   ├── main.py                    # FastAPI app + lifespan (init_db)
 │   ├── config.py                  # Settings from environment
-│   ├── models.py                  # Pydantic models
-│   │
-│   ├── clients/
-│   │   ├── __init__.py
-│   │   └── royale_client.py       # Async httpx client to RoyaleAPI proxy
-│   │
-│   ├── analysis/
-│   │   ├── __init__.py
-│   │   ├── deck_analyzer.py       # Rule-based deck analysis (archetype, flags, etc.)
-│   │   ├── advice_engine.py       # Combine analysis → advice
-│   │   └── llm_advisor.py         # Optional OpenAI-powered summary
-│   │
-│   └── routers/
-│       ├── __init__.py
-│       ├── players.py             # Player profile, deck, advice endpoints
-│       └── cards.py               # Cards reference endpoint
-│
+│   ├── models.py                  # Pydantic API models
+│   ├── db/                        # SQLModel entities + repositories
+│   ├── clients/                   # royale_client.py, openrouter_client.py (shared LLM client)
+│   ├── analysis/                  # deck_analyzer, advice_engine, llm_advisor, issue_codes
+│   ├── i18n/                      # pt-BR string templates
+│   └── routers/                   # players.py, cards.py
+├── ingestion/                      # Reddit ingestion pipeline (standalone CLI)
+├── scripts/                        # seed_cards.py
+├── specs/                          # Spec-Driven Development docs for the frontend
 └── tests/
-    ├── __init__.py
-    ├── test_royale_client.py      # Client tests with respx mocks
-    └── test_deck_analyzer.py      # Analysis logic tests
 ```
 
----
+## Optional: LLM-Powered Features
+
+If `OPENROUTER_API_KEY` is set, two features activate:
+1. `/players/{tag}/advice`'s `llm_summary` field — a short personalized coaching paragraph
+2. `/players/{tag}/ask` — the free-text Q&A endpoint
+
+Both use `app/clients/openrouter_client.py`'s shared client with primary/fallback model retry; without the key, the app works fully, just without these two features.
 
 ## Troubleshooting
 
-### 403 Forbidden Error
-**Issue:** `API key invalid or proxy IP not whitelisted.`
-
-**Solution:**
-1. Check your `ROYALE_API_KEY` in `.env` is correct (copy from RoyaleAPI dashboard)
-2. Ensure you've added `45.79.218.79` to **ALLOWED IP ADDRESSES** in your RoyaleAPI account settings
-3. Wait a few minutes for the IP whitelist to take effect
+### 403 Forbidden
+Check `ROYALE_API_KEY` in `.env`, and that `45.79.218.79` is added to **ALLOWED IP ADDRESSES** in your RoyaleAPI dashboard (may take a few minutes to propagate).
 
 ### 404 Player Not Found
-**Issue:** Player tag returns "not found"
+Verify the tag exists; tags work with or without a leading `#`.
 
-**Solution:**
-1. Verify the tag exists (search on Clash Royale community website)
-2. Tags are case-sensitive; try `#2PP` or `2PP` (with or without #)
-3. If still failing, the player may have been deleted or the tag is typo'd
-
-### Import Errors
-**Issue:** `ModuleNotFoundError` when running `uvicorn`
-
-**Solution:**
-1. Activate virtual environment: `.\venv\Scripts\activate`
-2. Reinstall: `pip install -r requirements.txt`
-3. Check Python version: `python --version` (3.8+ required)
+### `POST /players/{tag}/ask` returns 400
+Either `OPENROUTER_API_KEY` isn't set, or every configured OpenRouter model failed — check server logs for the specific model error.
 
 ### Tests Fail
-**Issue:** `pytest` tests don't run
-
-**Solution:**
-1. Install test dependencies: `pip install pytest pytest-asyncio respx httpx`
-2. Run from project root: `pytest` or `pytest -v` for verbose
-3. Check that respx is mocking correctly (tests should not make real API calls)
-
----
+Run from the project root with the venv active: `pytest -v`. No live API calls are made; a failure means a real regression, not a network/credentials issue.
 
 ## Future Enhancements
 
-1. **Persistent Cache** — Move in-memory card cache to Redis/SQLite
-2. **Expanded Card Roles** — Add more nuanced role classifications (support, cycle card, etc.)
-3. **Player History** — Track deck changes and win-rate trends over time
-4. **Web UI** — Build React/Next.js frontend to visualize advice
-5. **Matchup Analysis** — Analyze win rate vs. specific card archetypes
-6. **Replay Integration** — Fetch and analyze actual battle replays (if API supports)
-7. **Rate Limiting** — Add request throttling and caching for production
-8. **Database** — Store player stats, advice history for analytics
-
----
+- Frontend implementation (see `specs/frontend-app/tasks.md`)
+- Clan endpoints (client method exists; no router yet)
+- Async DB engine (currently sync SQLModel sessions — fine at this scale, documented as a deliberate simplicity tradeoff)
 
 ## License
 
 MIT
-
----
-
-## Support
-
-For issues or questions, check:
-- [RoyaleAPI Docs](https://royaleapi.com)
-- [Clash Royale API Docs](https://developer.clashroyale.com)
-- [FastAPI Docs](https://fastapi.tiangolo.com)
-
----
-
-**Happy deck building! 🏆**

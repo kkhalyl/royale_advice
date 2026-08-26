@@ -254,10 +254,13 @@ async def get_player_advice(tag: str, include_llm: bool = Query(True)):
 
     # Run deck analysis
     analysis = DeckAnalyzer.analyze_deck(deck, battlelog)
+    king_level = player_data.get("expLevel")
 
-    # Generate rule-based advice
-    suggested_swaps = AdviceEngine.generate_swap_suggestions(deck, analysis)
-    general_tips = AdviceEngine.generate_general_tips(analysis)
+    # Generate advice: Reddit-sourced community tips (when available) merged
+    # with the deterministic rule-based suggestions, which always fill in
+    # the rest.
+    suggested_swaps = AdviceEngine.generate_swap_suggestions(deck, analysis, king_level=king_level)
+    general_tips = AdviceEngine.generate_general_tips(analysis, cards=deck, king_level=king_level)
 
     # Optional LLM summary
     llm_summary = None

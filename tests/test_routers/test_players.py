@@ -8,7 +8,7 @@ import pytest
 import respx
 from fastapi.testclient import TestClient
 
-from app.db.repositories import battle_repo, card_repo, player_repo
+from app.db.repositories import battle_repo, card_repo, player_repo, tip_repo
 from app.main import app
 
 client = TestClient(app)
@@ -105,6 +105,25 @@ def test_get_player_advice_has_structured_issues_and_no_llm_by_default_key():
     for issue in body["analysis"]["flagged_issues"]:
         assert "code" in issue
         assert "message" in issue
+    for swap in body["suggested_swaps"]:
+        assert swap["source"] in ("rule_based", "reddit")
+
+
+def test_get_player_advice_surfaces_reddit_tip_when_present():
+    from datetime import datetime, timedelta
+
+    tip_repo.upsert_tip(
+        subject_type="card",
+        subject_key="Hog Rider",
+        text="Segure o Hog com o Cavaleiro antes de contra-atacar.",
+        stale_after=datetime.utcnow() + timedelta(days=30),
+        confidence=0.9,
+    )
+
+    response = client.get("/players/2PP/advice?include_llm=false")
+    assert response.status_code == 200
+    sources = {swap["source"] for swap in response.json()["suggested_swaps"]}
+    assert "reddit" in sources
 
 
 def test_get_cards_persists_catalog():
@@ -144,8 +163,8 @@ class TestAskWitch:
 
     def test_ask_returns_answer_when_configured(self, monkeypatch):
         monkeypatch.setattr("app.routers.players.settings.openrouter_api_key", "test-key")
-        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_primary_model", "primary/model")
-        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_fallback_model", "")
+        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_primary_model", "primary/model")
+        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_fallback_model", "")
 
         message = SimpleNamespace(content="Segure o Cavaleiro e contra-ataque com o Porco.")
         choice = SimpleNamespace(message=message)
@@ -162,8 +181,8 @@ class TestAskWitch:
 
     def test_ask_returns_400_when_model_fails(self, monkeypatch):
         monkeypatch.setattr("app.routers.players.settings.openrouter_api_key", "test-key")
-        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_primary_model", "primary/model")
-        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_fallback_model", "")
+        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_primary_model", "primary/model")
+        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_fallback_model", "")
 
         mock_client = AsyncMock()
         mock_client.chat.completions.create = AsyncMock(side_effect=Exception("boom"))

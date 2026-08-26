@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     openrouter_primary_model: str = "nvidia/nemotron-3-ultra-550b-a55b:free"
     openrouter_fallback_model: str = "google/gemma-4-26b-a4b-it:free"
     database_url: str = "sqlite:///./data/royal_advice.db"
+    reddit_client_id: Optional[str] = None
+    reddit_client_secret: Optional[str] = None
+    reddit_user_agent: str = "royal-advice/0.1"
     # Comma-separated list of allowed frontend origins in production. Ignored
     # while debug=True, where all origins are allowed for local dev.
     cors_origins: str = "http://localhost:5173"

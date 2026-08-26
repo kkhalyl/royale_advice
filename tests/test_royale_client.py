@@ -195,6 +195,25 @@ class TestCaching:
             assert route.call_count == 1
 
     @pytest.mark.asyncio
+    async def test_get_cards_force_bypasses_both_cache_tiers(self, client):
+        """force=True must re-fetch from the live API even when both the
+        in-memory and persisted caches are fresh - this is what
+        scripts/seed_cards.py relies on to actually force a refresh."""
+        mock_cards = [{"id": 1, "name": "Hog Rider", "elixirCost": 4, "rarity": "Rare"}]
+
+        with respx.mock:
+            route = respx.get("https://proxy.royaleapi.dev/v1/cards").mock(
+                return_value=httpx.Response(200, json=mock_cards)
+            )
+
+            await client.get_cards()  # populates both cache tiers
+            await client.get_cards()  # would normally be served from cache
+            assert route.call_count == 1
+
+            await client.get_cards(force=True)
+            assert route.call_count == 2
+
+    @pytest.mark.asyncio
     async def test_get_cards_persists_to_db(self, client):
         """Fetching cards should upsert them into the persisted catalog."""
         mock_cards = [

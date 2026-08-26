@@ -27,7 +27,7 @@ async def get_all_cards():
         raise HTTPException(status_code=400, detail=str(e))
 
     cards = [
-        Card(id=c.id, name=c.name, elixir=c.elixir, rarity=c.rarity, type=c.type)
+        Card(id=c.id, name=c.name, elixir=c.elixir, rarity=c.rarity, type=c.type, icon_url=c.icon_url)
         for c in card_repo.get_all_cards()
     ]
 
@@ -49,4 +49,6 @@ async def get_card_by_id(card_id: int):
     if card is None:
         raise HTTPException(status_code=404, detail=f"Card {card_id} not found in catalog.")
 
-    return Card(id=card.id, name=card.name, elixir=card.elixir, rarity=card.rarity, type=card.type)
+    return Card(
+        id=card.id, name=card.name, elixir=card.elixir, rarity=card.rarity, type=card.type, icon_url=card.icon_url
+    )

@@ -1,0 +1,65 @@
+/* Royal Advice — palette tokens (see specs/frontend-app/design.md) */
+:root {
+  /* Tavern night (screen backgrounds) */
+  --tavern-night-start: #1a1030;
+  --tavern-night-mid: #2b1a4e;
+  --tavern-night-end: #17102a;
+
+  /* Cauldron green (cauldron panel background/ambience) */
+  --cauldron-bg-start: #1c3d2a;
+  --cauldron-bg-mid: #0e1a13;
+  --cauldron-bg-end: #090f0b;
+  --cauldron-glow: #7ee787;
+  --cauldron-glow-dim: rgba(126, 231, 135, 0.15);
+
+  /* Crown gold (primary buttons, active pill, bubble border) */
+  --gold-light: #ffe08a;
+  --gold: #f0b429;
+  --gold-dark: #9c6b12;
+  --gold-text: #4a2e05;
+
+  /* Elixir (elixir badge) */
+  --elixir-light: #f2a6ff;
+  --elixir: #d63bd6;
+  --elixir-dark: #7b1fa2;
+
+  /* Magic purple (archetype badge, inactive pills) */
+  --magic-light: #c9b3ff;
+  --magic: #8b5cf6;
+  --magic-dark: #3a2566;
+
+  /* Parchment (every witch-dialogue/speech bubble) */
+  --parchment-light: #f3e6c4;
+  --parchment-dark: #e6d3a0;
+  --parchment-border: #a9832f;
+  --parchment-text: #3a2a12;
+
+  /* Rarity colors (card frames) */
+  --rarity-common-light: #a9b4c2;
+  --rarity-common-dark: #5f6b7a;
+  --rarity-common-border: #8a94a3;
+
+  --rarity-rare-light: #ffb066;
+  --rarity-rare-dark: #c9560a;
+  --rarity-rare-border: #ff8f3c;
+
+  --rarity-epic-light: #d9a6ff;
+  --rarity-epic-dark: #7b2fb5;
+  --rarity-epic-border: #b46be0;
+
+  --rarity-legendary-light: #ffe08a;
+  --rarity-legendary-dark: #ff6ec7;
+  --rarity-legendary-border: #ffd54f;
+
+  /* Text on dark backgrounds */
+  --text-on-dark: #efe7ff;
+  --text-on-dark-dim: #9c97c9;
+  --text-on-cauldron: #eafff0;
+  --text-on-cauldron-dim: #9fd6ab;
+
+  /* Error accent */
+  --error: #ff9a9a;
+
+  --font-display: 'Baloo 2', system-ui, sans-serif;
+  --font-body: 'Nunito Sans', system-ui, sans-serif;
+}

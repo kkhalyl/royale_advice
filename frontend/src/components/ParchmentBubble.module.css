@@ -1,0 +1,68 @@
+.bubble {
+  background: linear-gradient(180deg, var(--parchment-light), var(--parchment-dark));
+  border: 3px solid var(--parchment-border);
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45), inset 0 0 30px rgba(160, 120, 40, 0.25);
+  color: var(--parchment-text);
+  padding: 20px 30px;
+  text-align: center;
+}
+
+.label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a6a20;
+  margin-bottom: 6px;
+}
+
+.content {
+  font-size: 17px;
+  line-height: 1.55;
+  font-style: italic;
+}
+
+.askRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  background: rgba(58, 42, 18, 0.08);
+  border: 1.5px dashed #b6924a;
+  border-radius: 10px;
+  padding: 8px 10px 8px 16px;
+}
+
+.askInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 14.5px;
+  color: #8a6a20;
+  font-family: var(--font-body);
+  outline: none;
+}
+
+.askInput::placeholder {
+  color: #8a6a20;
+  opacity: 0.8;
+}
+
+.askSend {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
+  border: 2px solid var(--gold-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.askSend:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

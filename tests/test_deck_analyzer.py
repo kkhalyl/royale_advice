@@ -179,6 +179,14 @@ class TestCardRoles:
     def test_get_primary_role_prioritizes_tank_over_win_condition(self):
         assert DeckAnalyzer.get_primary_role("Royal Giant") == "tank"
 
+    def test_giant_snowball_is_a_spell_not_a_win_condition(self):
+        # Regression: Giant Snowball was misclassified as "win_condition" -
+        # it's actually a small/light spell, which meant decks running it
+        # were incorrectly flagged as missing a spell entirely.
+        roles = DeckAnalyzer.get_card_roles("Giant Snowball")
+        assert roles == {"spell"}
+        assert DeckAnalyzer.get_primary_role("Giant Snowball") == "spell"
+
 
 class TestDeckFlags:
     """Test deck flag detection."""
@@ -197,6 +205,25 @@ class TestDeckFlags:
         ]
         issues, _ = DeckAnalyzer.check_deck_flags(no_spell_deck)
         # Should not have the missing-spell issue since Zap is there
+        assert not any(i.code == IssueCode.MISSING_SPELL.value for i in issues)
+
+    def test_giant_snowball_no_longer_masks_missing_win_condition(self):
+        # Regression: Giant Snowball was misclassified with role
+        # "win_condition", which meant a deck with no real win condition
+        # (just a building, some cheap troops, and Giant Snowball) silently
+        # passed the no-win-condition check. It should not.
+        deck = [
+            Card(id=1, name="Cannon", elixir=3, rarity="Common", type="building"),
+            Card(id=2, name="Skeletons", elixir=1, rarity="Common", type="troop"),
+            Card(id=3, name="Bats", elixir=2, rarity="Common", type="troop"),
+            Card(id=4, name="Giant Snowball", elixir=2, rarity="Common", type="spell"),
+            Card(id=5, name="Knight", elixir=3, rarity="Common", type="troop"),
+            Card(id=6, name="Archers", elixir=3, rarity="Common", type="troop"),
+            Card(id=7, name="Valkyrie", elixir=4, rarity="Rare", type="troop"),
+            Card(id=8, name="Musketeer", elixir=4, rarity="Rare", type="troop"),
+        ]
+        issues, _ = DeckAnalyzer.check_deck_flags(deck)
+        assert any(i.code == IssueCode.NO_WIN_CONDITION.value for i in issues)
         assert not any(i.code == IssueCode.MISSING_SPELL.value for i in issues)
 
     def test_flags_high_elixir(self, high_elixir_deck):

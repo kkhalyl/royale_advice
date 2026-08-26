@@ -71,19 +71,19 @@ class AdviceEngine:
 
         if IssueCode.MISSING_SPELL.value in issue_codes:
             rule_based.append(TipDetail(
-                text="Adicione um feitico (Bola de Fogo, Zap ou Veneno) para mais versatilidade e controle.",
+                text="Adicione um feitiço (Bola de Fogo, Zap ou Veneno) para mais versatilidade e controle.",
                 source="rule_based",
             ))
 
         if IssueCode.MISSING_LIGHT_SPELL.value in issue_codes:
             rule_based.append(TipDetail(
-                text="Considere trocar uma carta por um feitico leve (Zap, Tronco ou Bola de Neve) para ciclar mais rapido.",
+                text="Considere trocar uma carta por um feitiço leve (Zap, Tronco ou Bola de Neve) para ciclar mais rápido.",
                 source="rule_based",
             ))
 
         if IssueCode.NO_WIN_CONDITION.value in issue_codes:
             rule_based.append(TipDetail(
-                text="Seu deck nao tem uma condicao de vitoria clara (ex: Montador de Porco, P.E.K.K.A, Balao). "
+                text="Seu deck não tem uma condição de vitória clara (ex: Montador de Porco, P.E.K.K.A, Balão). "
                      "Adicione uma para dar dano consistente nas torres.",
                 source="rule_based",
             ))
@@ -110,25 +110,25 @@ class AdviceEngine:
 
         if analysis.archetype == "cycle":
             rule_based.append(TipDetail(
-                text="Decks de ciclo vivem de trocas rapidas--use as baratas pra defender, depois contra-ataca com seu dano.",
+                text="Decks de ciclo vivem de trocas rápidas — use as baratas pra defender, depois contra-ataque com seu dano.",
                 source="rule_based",
             ))
 
         if analysis.archetype == "beatdown":
             rule_based.append(TipDetail(
-                text="Decks pesados mandam bem com ataques gigantes--guarda elixir pra fazer mega pushes. Defende o minimo possivel.",
+                text="Decks pesados mandam bem com ataques gigantes — guarde elixir pra fazer mega pushes. Defenda o mínimo possível.",
                 source="rule_based",
             ))
 
         if analysis.archetype == "control":
             rule_based.append(TipDetail(
-                text="Decks de controle vencem defendendo bem e contra-atacando--foca em defesas limpas e castiga erros.",
+                text="Decks de controle vencem defendendo bem e contra-atacando — foque em defesas limpas e castigue erros.",
                 source="rule_based",
             ))
 
         if analysis.archetype == "siege":
             rule_based.append(TipDetail(
-                text="Decks de cerco dependem de posicionar construcoes certo e usar feiticos--coloca no centro e protege.",
+                text="Decks de cerco dependem de posicionar construções certo e usar feitiços — coloque no centro e proteja.",
                 source="rule_based",
             ))
 
@@ -136,8 +136,8 @@ class AdviceEngine:
 
         if analysis.win_rate < 40.0 and analysis.win_rate > 0:
             rule_based.append(TipDetail(
-                text="Sua taxa de vitoria esta abaixo de 40%--considere jogar com esse deck em outras faixas de "
-                     "trofeus ou mudar para um arquetipo que voce domina melhor.",
+                text="Sua taxa de vitória está abaixo de 40% — considere jogar com esse deck em outras faixas de "
+                     "troféus ou mudar para um arquétipo que você domina melhor.",
                 source="rule_based",
             ))
 
@@ -169,45 +169,45 @@ class AdviceEngine:
         # === Elixir management ===
         if analysis.avg_elixir < 3.5:
             tips.append(TipDetail(
-                text="Seu deck e rapido--cicle bem e pressione cedo pra aproveitar a velocidade.",
+                text="Seu deck é rápido — cicle bem e pressione cedo pra aproveitar a velocidade.",
                 source="rule_based",
             ))
         elif analysis.avg_elixir >= 4.5:
             tips.append(TipDetail(
-                text="Seu deck e pesado--defenda bem gastando pouco e faz contra-ataques fortes.",
+                text="Seu deck é pesado — defenda bem gastando pouco e faça contra-ataques fortes.",
                 source="rule_based",
             ))
         else:
             tips.append(TipDetail(
-                text="Seu deck e equilibrado--procure boas janelas pra atacar sem deixar de se defender.",
+                text="Seu deck é equilibrado — procure boas janelas pra atacar sem deixar de se defender.",
                 source="rule_based",
             ))
 
         # === Card placement ===
         tips.append(TipDetail(
-            text="Coloque suas cartas no centro para maximizar dano em area e cobertura de torre.",
+            text="Coloque suas cartas no centro para maximizar dano em área e cobertura de torre.",
             source="rule_based",
         ))
 
         # === Defense tips ===
         tips.append(TipDetail(
-            text="Sempre mantenha 2-3 cartas em ciclo pra defesa--nao gaste tudo num ataque so.",
+            text="Sempre mantenha 2-3 cartas em ciclo pra defesa — não gaste tudo num ataque só.",
             source="rule_based",
         ))
 
         # === Ladder progression ===
-        tips.append(TipDetail(text="Pratica esse deck bem antes de subir trofeus com ele.", source="rule_based"))
+        tips.append(TipDetail(text="Pratique esse deck bem antes de subir troféus com ele.", source="rule_based"))
 
         # === Archetype-specific tips ===
         if analysis.archetype in ["cycle", "beatdown"]:
             tips.append(TipDetail(
-                text="Foque pressao em uma raia e castigue quando o oponente gastar demais—nao espalhe na lateral.",
+                text="Foque pressão em uma raia e castigue quando o oponente gastar demais — não espalhe na lateral.",
                 source="rule_based",
             ))
 
         if analysis.archetype == "control":
             tips.append(TipDetail(
-                text="Jogue com calma—espere o oponente errar, depois golpeia com tudo.",
+                text="Jogue com calma — espere o oponente errar, depois golpeie com tudo.",
                 source="rule_based",
             ))
 

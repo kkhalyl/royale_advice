@@ -25,7 +25,6 @@ CARD_ROLES: Dict[str, FrozenSet[str]] = {
     "hog rider": frozenset({"win_condition"}),
     "goblin barrel": frozenset({"win_condition"}),
     "balloon": frozenset({"win_condition"}),
-    "giant snowball": frozenset({"win_condition"}),
     "mortar": frozenset({"win_condition", "building"}),
     "bomb tower": frozenset({"win_condition", "building"}),
     "cannon cart": frozenset({"win_condition"}),
@@ -47,6 +46,7 @@ CARD_ROLES: Dict[str, FrozenSet[str]] = {
     "freeze": frozenset({"spell"}),
     "rocket": frozenset({"spell"}),
     "snowball": frozenset({"spell"}),
+    "giant snowball": frozenset({"spell"}),
     "earthquake": frozenset({"spell"}),
     "heal spirit": frozenset({"spell"}),
     "clone": frozenset({"spell"}),
@@ -92,7 +92,7 @@ CARD_ROLES: Dict[str, FrozenSet[str]] = {
 # card's display type). Earlier entries win when a card has multiple roles.
 _ROLE_PRIORITY = ["tank", "win_condition", "building", "anti_air", "spell", "support"]
 
-SMALL_SPELLS = {"zap", "log", "snowball", "arrows", "heal spirit"}
+SMALL_SPELLS = {"zap", "log", "snowball", "giant snowball", "arrows", "heal spirit"}
 
 
 class DeckAnalyzer:

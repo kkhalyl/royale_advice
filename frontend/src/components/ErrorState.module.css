@@ -1,0 +1,9 @@
+.wrap {
+  border: 1.5px dashed var(--error);
+  background: rgba(255, 154, 154, 0.08);
+  border-radius: 12px;
+  padding: 20px 24px;
+  text-align: center;
+  color: var(--error);
+  font-style: italic;
+}

@@ -148,24 +148,30 @@ class RoyaleClient:
 
         return await self._request("GET", endpoint)
 
-    async def get_cards(self) -> Dict[str, Dict]:
+    async def get_cards(self, force: bool = False) -> Dict[str, Dict]:
         """
         Fetch all cards. Two-tier cache: in-memory (this process, 24h TTL)
         backed by the persisted card catalog (app/db/repositories/card_repo.py),
         which survives process restarts. Only hits the live API when both
-        caches are stale.
+        caches are stale, unless force=True (used by scripts/seed_cards.py
+        to force a real refresh regardless of either cache tier's TTL).
+
+        Args:
+            force: Skip both cache tiers and always fetch fresh from the API.
 
         Returns:
             Dict mapping card ID to card details (name, elixir, rarity, type, etc.)
         """
-        # Tier 1: in-memory cache for this process.
         now = datetime.now()
-        if self._cards_cache is not None and self._cards_cache_time is not None:
-            if now - self._cards_cache_time < self._cache_ttl:
-                return self._cards_cache
+
+        if not force:
+            # Tier 1: in-memory cache for this process.
+            if self._cards_cache is not None and self._cards_cache_time is not None:
+                if now - self._cards_cache_time < self._cache_ttl:
+                    return self._cards_cache
 
         # Tier 2: persisted catalog, if not stale.
-        if not card_repo.is_catalog_stale(self._cache_ttl):
+        if not force and not card_repo.is_catalog_stale(self._cache_ttl):
             persisted = card_repo.get_all_cards()
             if persisted:
                 cards_dict = {}
@@ -176,6 +182,7 @@ class RoyaleClient:
                         "elixirCost": card.elixir,
                         "rarity": card.rarity,
                         "type": card.type,
+                        "iconUrls": {"medium": card.icon_url} if card.icon_url else {},
                     }
                     cards_dict[card.name.lower()] = cards_dict[str(card.id)]
                 self._cards_cache = cards_dict

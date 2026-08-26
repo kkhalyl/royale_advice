@@ -13,6 +13,7 @@ class Card(BaseModel):
     elixir: int
     rarity: str
     type: str  # "troop", "spell", "building"
+    icon_url: Optional[str] = None
 
 
 class DeckCard(BaseModel):
@@ -35,6 +36,7 @@ class PlayerSummary(BaseModel):
     wins: int
     losses: int
     draws: int
+    king_level: Optional[int] = None
     current_deck: List[Card]  # Cards in current deck
 
 
@@ -48,12 +50,6 @@ class BattleStats(BaseModel):
     draws: int
     win_rate: float  # percentage 0-100
     avg_elixir_last_battles: float
-
-
-class CardRole(BaseModel):
-    """Card role classification for analysis."""
-    name: str
-    role: str  # "tanque", "feitico", "condicao_vitoria", "suporte", "construcao", "antiaereo"
 
 
 class IssueDetail(BaseModel):

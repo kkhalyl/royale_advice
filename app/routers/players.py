@@ -49,12 +49,15 @@ async def _get_enriched_deck(player_data: dict, client) -> list[Card]:
             else:
                 card_type = "troop"
 
+        icon_url = (db_card.get("iconUrls") or {}).get("medium") or (persisted_card.icon_url if persisted_card else None)
+
         card = Card(
             id=int(card_id),
             name=card_name,
             elixir=db_card.get("elixirCost", card_data.get("elixirCost", 0)),
             rarity=card_data.get("rarity", db_card.get("rarity", "Common")),
             type=card_type,
+            icon_url=icon_url,
         )
         deck.append(card)
     return deck
@@ -109,6 +112,7 @@ async def get_player(tag: str):
         wins=player_data.get("wins", 0),
         losses=player_data.get("losses", 0),
         draws=player_data.get("draws", 0),
+        king_level=player_data.get("expLevel"),
         current_deck=deck,
     )
 
@@ -310,7 +314,7 @@ async def ask_witch(tag: str, request: AskRequest):
     if not settings.openrouter_api_key:
         raise HTTPException(
             status_code=400,
-            detail="A bruxa esta em silencio hoje - OPENROUTER_API_KEY nao configurada.",
+            detail="A bruxa está em silêncio hoje - OPENROUTER_API_KEY não configurada.",
         )
 
     client = get_client()
@@ -336,7 +340,7 @@ async def ask_witch(tag: str, request: AskRequest):
     if answer is None:
         raise HTTPException(
             status_code=400,
-            detail="A bruxa nao conseguiu ler as cartas agora. Tente novamente.",
+            detail="A bruxa não conseguiu ler as cartas agora. Tente novamente.",
         )
 
     return AskResponse(answer=answer)

@@ -54,12 +54,12 @@ class TestSwapSuggestionsMatchOnCode:
     def test_missing_spell_triggers_spell_suggestion(self, sample_cards):
         analysis = _analysis(issue_codes=[IssueCode.MISSING_SPELL])
         suggestions = AdviceEngine.generate_swap_suggestions(sample_cards, analysis)
-        assert any("feitico" in s.lower() for s in _texts(suggestions))
+        assert any("feitiço" in s.lower() for s in _texts(suggestions))
 
     def test_no_win_condition_triggers_suggestion(self, sample_cards):
         analysis = _analysis(issue_codes=[IssueCode.NO_WIN_CONDITION])
         suggestions = AdviceEngine.generate_swap_suggestions(sample_cards, analysis)
-        assert any("condicao de vitoria" in s.lower() for s in _texts(suggestions))
+        assert any("condição de vitória" in s.lower() for s in _texts(suggestions))
 
     def test_no_air_defense_triggers_suggestion(self, sample_cards):
         analysis = _analysis(issue_codes=[IssueCode.NO_AIR_DEFENSE])
@@ -72,7 +72,7 @@ class TestSwapSuggestionsMatchOnCode:
         # code-based rather than text-based.
         analysis = _analysis(issue_codes=[IssueCode.RARITY_CLUSTERING])
         suggestions = AdviceEngine.generate_swap_suggestions(sample_cards, analysis)
-        assert not any("feitico" in s.lower() and "leve" not in s.lower() for s in _texts(suggestions))
+        assert not any("feitiço" in s.lower() and "leve" not in s.lower() for s in _texts(suggestions))
 
     def test_archetype_specific_suggestion_added(self, sample_cards):
         analysis = _analysis(archetype="beatdown", issue_codes=[])
@@ -172,7 +172,7 @@ class TestGeneralTips:
     def test_low_elixir_gets_fast_cycle_tip(self):
         analysis = _analysis(avg_elixir=2.8)
         tips = AdviceEngine.generate_general_tips(analysis)
-        assert any("rapido" in t.lower() for t in _texts(tips))
+        assert any("rápido" in t.lower() for t in _texts(tips))
 
     def test_high_elixir_gets_heavy_deck_tip(self):
         analysis = _analysis(avg_elixir=5.0)

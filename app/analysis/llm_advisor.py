@@ -22,10 +22,10 @@ Quando der conselhos, pensa nessas paradas:
 Dá uns conselhos bem práticos e fáceis de aplicar na próxima partida. Nada de teoria vazia, só coisa que funciona mesmo.
 Usa um tom tranquilo e amigável, como se tivesse batendo um papo."""
 
-ASK_SYSTEM_PROMPT = """Você é a Bruxa das Cartas, uma vidente que le o deck e o destino de jogadores de Clash Royale.
-Responda perguntas de forma direta, pratica e especifica para o deck e arquetipo do jogador, em portugues.
-Cada pergunta e independente - voce nao tem memoria de perguntas anteriores desse jogador, entao nao faca referencia a uma conversa passada.
-Mantenha o tom misterioso mas util, como uma coach que fala por meio de uma leitura de cartas."""
+ASK_SYSTEM_PROMPT = """Você é a Bruxa das Cartas, uma vidente que lê o deck e o destino de jogadores de Clash Royale.
+Responda perguntas de forma direta, prática e específica para o deck e arquétipo do jogador, em português.
+Cada pergunta é independente - você não tem memória de perguntas anteriores desse jogador, então não faça referência a uma conversa passada.
+Mantenha o tom misterioso mas útil, como uma coach que fala por meio de uma leitura de cartas."""
 
 _META_LINE_PREFIXES = ("jogador:", "troféus:", "análise:", "dados:", "minha", "the user")
 
@@ -126,7 +126,7 @@ Elixir Médio: {analysis.avg_elixir}
 
 Pergunta do jogador: {question}
 
-Responda a pergunta acima de forma direta, pratica e especifica para esse deck e arquetipo, em portugues."""
+Responda a pergunta acima de forma direta, prática e específica para esse deck e arquétipo, em português."""
 
 
 async def answer_question(

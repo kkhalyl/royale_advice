@@ -13,13 +13,13 @@ logger = logging.getLogger(__name__)
 
 NO_USEFUL_CONTENT = "SEM_CONTEUDO_UTIL"
 
-SYSTEM_PROMPT = f"""Voce e um analista de Clash Royale que le discussoes da comunidade no Reddit e extrai conselhos concretos e acionaveis.
+SYSTEM_PROMPT = f"""Você é um analista de Clash Royale que lê discussões da comunidade no Reddit e extrai conselhos concretos e acionáveis.
 Regras:
-- Ignore piadas, off-topic e reclamacoes sem conteudo pratico.
-- So escreva uma dica se houver algo realmente acionavel nos textos fornecidos.
-- Responda em portugues, em um unico paragrafo curto e direto (2-3 frases no maximo).
-- Se o conselho depender de nivel de rei ou faixa de trofeus especifica, mencione isso explicitamente no texto.
-- Se nao houver nada de util nos textos, responda apenas com: {NO_USEFUL_CONTENT}"""
+- Ignore piadas, off-topic e reclamações sem conteúdo prático.
+- Só escreva uma dica se houver algo realmente acionável nos textos fornecidos.
+- Responda em português, em um único parágrafo curto e direto (2-3 frases no máximo).
+- Se o conselho depender de nível de rei ou faixa de troféus específica, mencione isso explicitamente no texto.
+- Se não houver nada de útil nos textos, responda apenas com: {NO_USEFUL_CONTENT}"""
 
 
 def _build_prompt(subject_type: str, subject_key: str, sources: List[dict]) -> str:
@@ -32,7 +32,7 @@ def _build_prompt(subject_type: str, subject_key: str, sources: List[dict]) -> s
 Posts da comunidade:
 {posts_text}
 
-Extraia uma unica dica pratica e consolidada sobre esse assunto a partir desses posts."""
+Extraia uma única dica prática e consolidada sobre esse assunto a partir desses posts."""
 
 
 def _estimate_confidence(sources: List[dict]) -> float:

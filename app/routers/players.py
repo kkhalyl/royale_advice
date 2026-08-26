@@ -2,10 +2,20 @@
 
 from fastapi import APIRouter, HTTPException, Query
 from app.clients import get_client, RoyaleAPIError
-from app.models import PlayerSummary, DeckAnalysis, Advice, Card, PlayerDeckView, BattleStats
+from app.config import settings
+from app.models import (
+    PlayerSummary,
+    DeckAnalysis,
+    Advice,
+    Card,
+    PlayerDeckView,
+    BattleStats,
+    AskRequest,
+    AskResponse,
+)
 from app.analysis.deck_analyzer import DeckAnalyzer
 from app.analysis.advice_engine import AdviceEngine
-from app.analysis.llm_advisor import generate_llm_summary
+from app.analysis.llm_advisor import generate_llm_summary, answer_question
 from app.db.repositories import card_repo, player_repo, battle_repo
 
 router = APIRouter(prefix="/players", tags=["players"])
@@ -272,3 +282,58 @@ async def get_player_advice(tag: str, include_llm: bool = Query(True)):
     )
 
     return advice
+
+
+@router.post("/{tag}/ask", response_model=AskResponse)
+async def ask_witch(tag: str, request: AskRequest):
+    """
+    Ask a single, free-text question about a player's current deck.
+
+    Stateless: each call is answered independently with no memory of
+    previous questions for this (or any) tag - nothing is persisted here.
+
+    Args:
+        tag: Player tag (with or without #)
+        request: The question to ask
+
+    Returns:
+        AskResponse with the witch's answer
+
+    Raises:
+        HTTPException 400: if OPENROUTER_API_KEY isn't configured, the
+            player/deck can't be fetched, or every configured model failed
+            to produce an answer
+    """
+    if not settings.openrouter_api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="A bruxa esta em silencio hoje - OPENROUTER_API_KEY nao configurada.",
+        )
+
+    client = get_client()
+
+    try:
+        player_data = await client.get_player(tag)
+    except RoyaleAPIError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    deck = await _get_enriched_deck(player_data, client)
+    if not deck:
+        raise HTTPException(status_code=400, detail="Unable to fetch player's current deck.")
+
+    analysis = DeckAnalyzer.analyze_deck(deck)
+
+    answer = await answer_question(
+        player_name=player_data.get("name", "Player"),
+        deck_card_names=[card.name for card in deck],
+        analysis=analysis,
+        question=request.question,
+    )
+
+    if answer is None:
+        raise HTTPException(
+            status_code=400,
+            detail="A bruxa nao conseguiu ler as cartas agora. Tente novamente.",
+        )
+
+    return AskResponse(answer=answer)

@@ -1,5 +1,8 @@
 """Endpoint-level tests for the players router, covering DB persist-through."""
 
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
+
 import httpx
 import pytest
 import respx
@@ -129,3 +132,43 @@ def test_get_player_stats_returns_battle_stats():
     body = response.json()
     assert body["total_battles"] == 1
     assert body["wins"] + body["losses"] + body["draws"] == body["total_battles"]
+
+
+class TestAskWitch:
+    """POST /players/{tag}/ask - stateless free-text question endpoint."""
+
+    def test_ask_without_api_key_returns_400(self, monkeypatch):
+        monkeypatch.setattr("app.routers.players.settings.openrouter_api_key", "")
+        response = client.post("/players/2PP/ask", json={"question": "Como jogo contra Golem?"})
+        assert response.status_code == 400
+
+    def test_ask_returns_answer_when_configured(self, monkeypatch):
+        monkeypatch.setattr("app.routers.players.settings.openrouter_api_key", "test-key")
+        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_primary_model", "primary/model")
+        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_fallback_model", "")
+
+        message = SimpleNamespace(content="Segure o Cavaleiro e contra-ataque com o Porco.")
+        choice = SimpleNamespace(message=message)
+        fake_response = SimpleNamespace(choices=[choice])
+
+        mock_client = AsyncMock()
+        mock_client.chat.completions.create = AsyncMock(return_value=fake_response)
+
+        with patch("openai.AsyncOpenAI", return_value=mock_client):
+            response = client.post("/players/2PP/ask", json={"question": "Como jogo contra Golem?"})
+
+        assert response.status_code == 200
+        assert response.json()["answer"] == "Segure o Cavaleiro e contra-ataque com o Porco."
+
+    def test_ask_returns_400_when_model_fails(self, monkeypatch):
+        monkeypatch.setattr("app.routers.players.settings.openrouter_api_key", "test-key")
+        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_primary_model", "primary/model")
+        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_fallback_model", "")
+
+        mock_client = AsyncMock()
+        mock_client.chat.completions.create = AsyncMock(side_effect=Exception("boom"))
+
+        with patch("openai.AsyncOpenAI", return_value=mock_client):
+            response = client.post("/players/2PP/ask", json={"question": "Alguma dica?"})
+
+        assert response.status_code == 400

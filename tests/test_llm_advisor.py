@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.analysis.llm_advisor import generate_llm_summary
+from app.analysis.llm_advisor import generate_llm_summary, answer_question
 from app.models import DeckAnalysis, IssueDetail
 
 
@@ -104,3 +104,77 @@ async def test_strips_metadata_looking_lines(monkeypatch):
         result = await generate_llm_summary("Player", 5000, _analysis(), [])
 
     assert result == "Use o ciclo rápido para pressionar."
+
+
+class TestAnswerQuestion:
+    """answer_question() - the stateless free-text 'ask the witch' path."""
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_no_api_key(self, monkeypatch):
+        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_api_key", "")
+        result = await answer_question("Player", ["Hog Rider"], _analysis(), "Como jogo contra Golem?")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_returns_answer_from_primary_model(self, monkeypatch):
+        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_api_key", "test-key")
+        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_primary_model", "primary/model")
+        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_fallback_model", "fallback/model")
+
+        mock_client = AsyncMock()
+        mock_client.chat.completions.create = AsyncMock(
+            return_value=_fake_response("Segure o Cavaleiro e contra-ataque com o Porco.")
+        )
+
+        with patch("openai.AsyncOpenAI", return_value=mock_client):
+            result = await answer_question(
+                "Player", ["Hog Rider", "Knight"], _analysis(), "Como jogo contra Golem?"
+            )
+
+        assert result == "Segure o Cavaleiro e contra-ataque com o Porco."
+        called_messages = mock_client.chat.completions.create.call_args.kwargs["messages"]
+        assert "Como jogo contra Golem?" in called_messages[1]["content"]
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_secondary_model(self, monkeypatch):
+        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_api_key", "test-key")
+        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_primary_model", "primary/model")
+        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_fallback_model", "fallback/model")
+
+        mock_client = AsyncMock()
+        mock_client.chat.completions.create = AsyncMock(
+            side_effect=[Exception("primary down"), _fake_response("Resposta do fallback.")]
+        )
+
+        with patch("openai.AsyncOpenAI", return_value=mock_client):
+            result = await answer_question("Player", ["Hog Rider"], _analysis(), "Alguma dica?")
+
+        assert result == "Resposta do fallback."
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_all_models_fail(self, monkeypatch):
+        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_api_key", "test-key")
+        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_primary_model", "primary/model")
+        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_fallback_model", "fallback/model")
+
+        mock_client = AsyncMock()
+        mock_client.chat.completions.create = AsyncMock(side_effect=Exception("boom"))
+
+        with patch("openai.AsyncOpenAI", return_value=mock_client):
+            result = await answer_question("Player", ["Hog Rider"], _analysis(), "Alguma dica?")
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_handles_empty_deck_gracefully(self, monkeypatch):
+        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_api_key", "test-key")
+        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_primary_model", "primary/model")
+        monkeypatch.setattr("app.analysis.llm_advisor.settings.openrouter_fallback_model", "")
+
+        mock_client = AsyncMock()
+        mock_client.chat.completions.create = AsyncMock(return_value=_fake_response("Resposta generica."))
+
+        with patch("openai.AsyncOpenAI", return_value=mock_client):
+            result = await answer_question("Player", [], _analysis(), "Alguma dica?")
+
+        assert result == "Resposta generica."

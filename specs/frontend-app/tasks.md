@@ -4,14 +4,17 @@ Derived from [`plan.md`](plan.md), against the approved [`design.md`](design.md)
 Do not start until `spec.md`, `design.md`, and `plan.md` are all
 reviewed/approved (see `specs/README.md`'s rule).
 
-## Backend prerequisite (do this first — frontend blocks on it)
-- [ ] Add `POST /players/{tag}/ask` (see `plan.md`'s "New backend
+## Backend prerequisite (done — frontend is unblocked)
+- [x] Add `POST /players/{tag}/ask` (see `plan.md`'s "New backend
       requirement"): `AskRequest`/`AskResponse` models, a route in
       `app/routers/players.py`, reusing `llm_advisor.py`'s OpenRouter client
-      setup; stateless, no persistence of questions/answers; 400 when
-      `OPENROUTER_API_KEY` is unset
-- [ ] Test the new endpoint (mocked OpenRouter client, matching
-      `tests/test_llm_advisor.py`'s pattern)
+      setup (extracted `_build_client()`/`_try_models()` shared with
+      `generate_llm_summary`); stateless, no persistence of
+      questions/answers; 400 when `OPENROUTER_API_KEY` is unset
+- [x] Test the new endpoint (mocked OpenRouter client, matching
+      `tests/test_llm_advisor.py`'s pattern) — `tests/test_llm_advisor.py`'s
+      `TestAnswerQuestion` and `tests/test_routers/test_players.py`'s
+      `TestAskWitch`
 
 ## Setup
 - [ ] Scaffold Vite + React + TS project in `frontend/`

@@ -97,6 +97,18 @@ class PlayerDeckView(BaseModel):
     card_count: int
 
 
+class AskRequest(BaseModel):
+    """A single, stateless free-text question for the /ask endpoint."""
+
+    question: str
+
+
+class AskResponse(BaseModel):
+    """The witch's single answer - no conversation history is kept."""
+
+    answer: str
+
+
 class Advice(BaseModel):
     """Complete gameplay advice for a player."""
     model_config = ConfigDict(from_attributes=True)

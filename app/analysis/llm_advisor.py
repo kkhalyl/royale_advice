@@ -24,6 +24,11 @@ Quando der conselhos, pensa nessas paradas:
 Dá uns conselhos bem práticos e fáceis de aplicar na próxima partida. Nada de teoria vazia, só coisa que funciona mesmo.
 Usa um tom tranquilo e amigável, como se tivesse batendo um papo."""
 
+ASK_SYSTEM_PROMPT = """Você é a Bruxa das Cartas, uma vidente que le o deck e o destino de jogadores de Clash Royale.
+Responda perguntas de forma direta, pratica e especifica para o deck e arquetipo do jogador, em portugues.
+Cada pergunta e independente - voce nao tem memoria de perguntas anteriores desse jogador, entao nao faca referencia a uma conversa passada.
+Mantenha o tom misterioso mas util, como uma coach que fala por meio de uma leitura de cartas."""
+
 _META_LINE_PREFIXES = ("jogador:", "troféus:", "análise:", "dados:", "minha", "the user")
 
 
@@ -68,6 +73,28 @@ def _clean_summary(raw: str) -> Optional[str]:
     return cleaned or None
 
 
+def _build_client():
+    """Build an OpenRouter-configured AsyncOpenAI client, or None if unavailable."""
+    if not settings.openrouter_api_key:
+        logger.debug("OpenRouter API key not configured; skipping LLM call.")
+        return None
+
+    try:
+        from openai import AsyncOpenAI
+    except ImportError:
+        logger.warning("openai library not installed; skipping LLM call.")
+        return None
+
+    return AsyncOpenAI(
+        api_key=settings.openrouter_api_key,
+        base_url=OPENROUTER_BASE_URL,
+        default_headers={
+            "HTTP-Referer": "https://royaladvice.local",
+            "X-Title": "Clash Royale Advice API",
+        },
+    )
+
+
 async def _call_model(client, model: str, messages: list) -> Optional[str]:
     """Call a single OpenRouter model and return its cleaned text, or None."""
     response = await client.chat.completions.create(
@@ -80,6 +107,28 @@ async def _call_model(client, model: str, messages: list) -> Optional[str]:
         return None
     content = response.choices[0].message.content
     return _clean_summary(content) if content else None
+
+
+async def _try_models(client, messages: list) -> Optional[str]:
+    """Try the primary model, then the fallback, returning the first usable result."""
+    models_to_try = [
+        m for m in (settings.openrouter_primary_model, settings.openrouter_fallback_model) if m
+    ]
+
+    for model in models_to_try:
+        try:
+            result = await _call_model(client, model, messages)
+        except Exception as e:
+            logger.warning(f"OpenRouter call with model {model} failed: {e}")
+            continue
+
+        if result:
+            return result
+
+        logger.warning(f"Model {model} returned no usable result; trying next option if available.")
+
+    logger.warning("All configured OpenRouter models failed or returned empty results.")
+    return None
 
 
 async def generate_llm_summary(
@@ -105,49 +154,71 @@ async def generate_llm_summary(
     Returns:
         Optional LLM summary string, or None if feature disabled/failed
     """
-    if not settings.openrouter_api_key:
-        logger.debug("OpenRouter API key not configured; skipping LLM summary generation.")
+    client = _build_client()
+    if client is None:
         return None
-
-    try:
-        from openai import AsyncOpenAI
-    except ImportError:
-        logger.warning("openai library not installed; skipping LLM summary.")
-        return None
-
-    client = AsyncOpenAI(
-        api_key=settings.openrouter_api_key,
-        base_url=OPENROUTER_BASE_URL,
-        default_headers={
-            "HTTP-Referer": "https://royaladvice.local",
-            "X-Title": "Clash Royale Advice API",
-        },
-    )
 
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": _build_user_prompt(player_name, trophies, analysis, suggested_swaps)},
     ]
 
-    models_to_try = [
-        m for m in (settings.openrouter_primary_model, settings.openrouter_fallback_model) if m
+    summary = await _try_models(client, messages)
+    if summary:
+        logger.info(f"Generated LLM summary in Portuguese for {player_name}.")
+    else:
+        logger.warning("Continuing with rule-based advice only.")
+    return summary
+
+
+def _build_ask_prompt(
+    player_name: str,
+    deck_card_names: List[str],
+    analysis: DeckAnalysis,
+    question: str,
+) -> str:
+    deck_text = ", ".join(deck_card_names) if deck_card_names else "desconhecido"
+
+    return f"""Jogador: {player_name}
+Deck atual: {deck_text}
+Arquétipo: {analysis.archetype}
+Elixir Médio: {analysis.avg_elixir}
+
+Pergunta do jogador: {question}
+
+Responda a pergunta acima de forma direta, pratica e especifica para esse deck e arquetipo, em portugues."""
+
+
+async def answer_question(
+    player_name: str,
+    deck_card_names: List[str],
+    analysis: DeckAnalysis,
+    question: str,
+) -> Optional[str]:
+    """
+    Answer a single free-text question about a player's deck (stateless -
+    no conversation history is kept or referenced between calls).
+
+    If OPENROUTER_API_KEY is not set, or every configured model fails,
+    returns None (the caller is responsible for surfacing this as an error
+    to the user - this function never raises).
+
+    Args:
+        player_name: Player name
+        deck_card_names: Names of the player's current deck cards
+        analysis: DeckAnalysis object for the player's current deck
+        question: The player's free-text question
+
+    Returns:
+        Optional answer string, or None if the feature is disabled/failed
+    """
+    client = _build_client()
+    if client is None:
+        return None
+
+    messages = [
+        {"role": "system", "content": ASK_SYSTEM_PROMPT},
+        {"role": "user", "content": _build_ask_prompt(player_name, deck_card_names, analysis, question)},
     ]
 
-    for model in models_to_try:
-        try:
-            summary = await _call_model(client, model, messages)
-        except Exception as e:
-            logger.warning(f"OpenRouter call with model {model} failed: {e}")
-            continue
-
-        if summary:
-            logger.info(f"Generated LLM summary in Portuguese for {player_name} using {model}.")
-            return summary
-
-        logger.warning(f"Model {model} returned no usable summary; trying next option if available.")
-
-    logger.warning(
-        "All configured OpenRouter models failed or returned empty summaries. "
-        "Continuing with rule-based advice only."
-    )
-    return None
+    return await _try_models(client, messages)

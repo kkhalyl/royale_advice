@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import players, cards
+from app.routers import players, cards, frontend_api
 from app.db.database import init_db
 from app.config import settings
 
@@ -34,6 +34,7 @@ app.add_middleware(
 # Include routers
 app.include_router(players.router)
 app.include_router(cards.router)
+app.include_router(frontend_api.router)
 
 
 @app.get("/health")

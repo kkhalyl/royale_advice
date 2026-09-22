@@ -183,6 +183,7 @@ class RoyaleClient:
                         "rarity": card.rarity,
                         "type": card.type,
                         "iconUrls": {"medium": card.icon_url} if card.icon_url else {},
+                        "maxEvolutionLevel": card.max_evolution_level,
                     }
                     cards_dict[card.name.lower()] = cards_dict[str(card.id)]
                 self._cards_cache = cards_dict

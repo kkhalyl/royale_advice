@@ -1,0 +1,58 @@
+.speech {
+  position: relative;
+  background: #fbf4e4;
+  color: #2a1740;
+  border: 3px solid var(--ink);
+  border-radius: 18px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 5px 0 var(--ink);
+  cursor: pointer;
+  min-height: 4.5rem;
+}
+
+/* rabinho apontando para a bruxa */
+.speech::before {
+  content: "";
+  position: absolute;
+  left: -16px;
+  top: 26px;
+  width: 22px;
+  height: 22px;
+  background: #fbf4e4;
+  border-left: 3px solid var(--ink);
+  border-bottom: 3px solid var(--ink);
+  transform: skewY(35deg) rotate(20deg);
+}
+
+.speech__text {
+  margin: 0;
+  font-family: var(--font-witch);
+  font-size: clamp(1.1rem, 1rem + 0.5vw, 1.35rem);
+  line-height: 1.45;
+  max-width: 52ch;
+}
+
+.speech__caret {
+  display: inline-block;
+  width: 0.5em;
+  height: 0.5em;
+  margin-left: 0.2em;
+  border-radius: 50%;
+  background: var(--brew);
+  animation: caret 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes caret {
+  to {
+    opacity: 0.2;
+    transform: scale(0.6);
+  }
+}
+
+@media (max-width: 760px) {
+  .speech::before {
+    left: 40px;
+    top: -15px;
+    transform: rotate(135deg);
+  }
+}

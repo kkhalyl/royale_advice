@@ -38,6 +38,7 @@ def upsert_cards(cards: List[dict]) -> None:
                 rarity=raw.get("rarity", "Common"),
                 type=_infer_type(name),
                 icon_url=(raw.get("iconUrls") or {}).get("medium"),
+                max_evolution_level=raw.get("maxEvolutionLevel"),
                 updated_at=now,
             )
 

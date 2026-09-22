@@ -38,7 +38,17 @@ def build_client():
 
 
 async def call_model(client, model: str, messages: list, **kwargs) -> Optional[str]:
-    """Call a single OpenRouter model and return its raw text, or None."""
+    """Call a single OpenRouter model and return its raw text, or None.
+
+    Some free-tier reasoning-capable models (e.g. Nemotron) mix their raw
+    chain-of-thought into `message.content` itself rather than a separate
+    field, in whatever language they "think" in - observed leaking English
+    reasoning into an otherwise Portuguese response. OpenRouter's
+    `reasoning: {exclude: true}` request extension tells the model to still
+    reason internally but never include it in the returned content, so this
+    is set by default here (callers can override by passing their own
+    `extra_body`)."""
+    kwargs.setdefault("extra_body", {"reasoning": {"exclude": True}})
     response = await client.chat.completions.create(model=model, messages=messages, **kwargs)
     if not response.choices:
         return None

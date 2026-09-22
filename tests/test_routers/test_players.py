@@ -27,11 +27,19 @@ PLAYER_PAYLOAD = {
         {"id": 1, "name": "Hog Rider", "rarity": "Rare"},
         {"id": 2, "name": "Fireball", "rarity": "Rare"},
         {"id": 3, "name": "Zap", "rarity": "Common"},
-        {"id": 4, "name": "Knight", "rarity": "Common"},
+        {"id": 4, "name": "Knight", "rarity": "Common", "evolutionLevel": 1, "maxEvolutionLevel": 3},
         {"id": 5, "name": "Musketeer", "rarity": "Rare"},
         {"id": 6, "name": "Cannon", "rarity": "Common"},
         {"id": 7, "name": "Ice Wizard", "rarity": "Legendary"},
-        {"id": 8, "name": "Skeletons", "rarity": "Common"},
+        {"id": 8, "name": "Skeletons", "rarity": "Common", "maxEvolutionLevel": 1},
+    ],
+    "currentDeckSupportCards": [
+        {
+            "id": 159000000,
+            "name": "Tower Princess",
+            "rarity": "Common",
+            "iconUrls": {"medium": "https://api-assets.clashroyale.com/cards/300/tower-princess.png"},
+        },
     ],
 }
 
@@ -80,12 +88,38 @@ def test_get_player_persists_player_row():
     assert persisted.clan_tag == "#CLAN1"
 
 
+def test_get_player_exposes_evolution_info():
+    response = client.get("/players/2PP")
+    assert response.status_code == 200
+    deck = {c["name"]: c for c in response.json()["current_deck"]}
+
+    assert deck["Knight"]["evolution_level"] == 1
+    assert deck["Knight"]["max_evolution_level"] == 3
+    # Has an evolution available but not equipped in this deck:
+    assert deck["Skeletons"]["max_evolution_level"] == 1
+    assert deck["Skeletons"]["evolution_level"] is None
+    # No evolution data at all:
+    assert deck["Cannon"]["max_evolution_level"] is None
+
+
+def test_get_player_exposes_support_card():
+    response = client.get("/players/2PP")
+    assert response.status_code == 200
+    support = response.json()["support_card"]
+    assert support is not None
+    assert support["name"] == "Tower Princess"
+    # Tower Troops aren't in the regular /cards catalog, so their icon must
+    # come from the deck-slot entry's own iconUrls, not the catalog lookup.
+    assert support["icon_url"] == "https://api-assets.clashroyale.com/cards/300/tower-princess.png"
+
+
 def test_get_player_deck_returns_typed_cards():
     response = client.get("/players/2PP/deck")
     assert response.status_code == 200
     body = response.json()
     assert body["card_count"] == 8
     assert body["avg_elixir"] > 0
+    assert body["support_card"]["name"] == "Tower Princess"
 
 
 def test_get_player_battlelog_persists_battles():

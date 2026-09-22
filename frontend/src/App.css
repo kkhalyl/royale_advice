@@ -1,0 +1,65 @@
+.stage {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--night);
+}
+
+.stage__layer {
+  position: absolute;
+  inset: 0;
+  transition: transform 1.15s var(--ease-magic), opacity 0.9s ease, filter 1.15s ease;
+  will-change: transform;
+}
+
+/* taverna surge com a luz da porta aberta */
+.stage__layer--tavern {
+  animation: tavern-in 0.9s ease backwards;
+}
+
+@keyframes tavern-in {
+  from {
+    opacity: 0;
+    filter: brightness(2.2) saturate(0.6);
+  }
+}
+
+/* caldeirão espera lá embaixo */
+.stage__layer--cauldron {
+  transform: translateY(100%) scale(1.2);
+  opacity: 0;
+}
+
+/* a bruxa sobe, você mergulha no caldeirão */
+.stage--cauldron .stage__layer--tavern {
+  transform: translateY(-108%) scale(0.92);
+  filter: blur(2px);
+}
+
+.stage--cauldron .stage__layer--cauldron {
+  transform: none;
+  opacity: 1;
+}
+
+.stage__dive {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 70%, var(--brew-glow) 0, var(--brew) 30%, transparent 70%);
+  mix-blend-mode: screen;
+  animation: dive 1.2s ease both;
+}
+
+@keyframes dive {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  45% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}

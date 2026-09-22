@@ -1,65 +1,38 @@
-/* Royal Advice — palette tokens (see specs/frontend-app/design.md) */
 :root {
-  /* Tavern night (screen backgrounds) */
-  --tavern-night-start: #1a1030;
-  --tavern-night-mid: #2b1a4e;
-  --tavern-night-end: #17102a;
+  /* Taverna */
+  --night: #150c2b;
+  --night-2: #231446;
+  --wood: #3d2517;
+  --wood-light: #6b4226;
 
-  /* Cauldron green (cauldron panel background/ambience) */
-  --cauldron-bg-start: #1c3d2a;
-  --cauldron-bg-mid: #0e1a13;
-  --cauldron-bg-end: #090f0b;
-  --cauldron-glow: #7ee787;
-  --cauldron-glow-dim: rgba(126, 231, 135, 0.15);
+  /* Clash Royale */
+  --royal: #1d63d8;
+  --royal-deep: #0c357f;
+  --royal-light: #4fa2ff;
+  --gold: #ffc83d;
+  --gold-deep: #e08a14;
+  --ink: #1b1030; /* contorno escuro dos textos estilo Clash */
 
-  /* Crown gold (primary buttons, active pill, bubble border) */
-  --gold-light: #ffe08a;
-  --gold: #f0b429;
-  --gold-dark: #9c6b12;
-  --gold-text: #4a2e05;
+  /* Magia / caldeirão */
+  --brew: #b44dff;
+  --brew-glow: #e39bff;
+  --spirit: #38e3c6;
+  --elixir: #e04ee8;
 
-  /* Elixir (elixir badge) */
-  --elixir-light: #f2a6ff;
-  --elixir: #d63bd6;
-  --elixir-dark: #7b1fa2;
+  /* Raridades */
+  --r-common: #8fb3d9;
+  --r-rare: #ff9d2e;
+  --r-epic: #b44de8;
+  --r-legendary: linear-gradient(135deg, #5ce1e6, #b98cff 35%, #ff8fd0 65%, #ffe066);
+  --r-champion: linear-gradient(135deg, #ffe38a, #ffb300 50%, #fff3c4);
 
-  /* Magic purple (archetype badge, inactive pills) */
-  --magic-light: #c9b3ff;
-  --magic: #8b5cf6;
-  --magic-dark: #3a2566;
+  --text: #f3eeff;
+  --text-dim: #b6a8d9;
 
-  /* Parchment (every witch-dialogue/speech bubble) */
-  --parchment-light: #f3e6c4;
-  --parchment-dark: #e6d3a0;
-  --parchment-border: #a9832f;
-  --parchment-text: #3a2a12;
+  --font-display: "Baloo 2", system-ui, sans-serif;
+  --font-body: "Nunito Sans", system-ui, sans-serif;
+  --font-witch: "Almendra", Georgia, serif;
 
-  /* Rarity colors (card frames) */
-  --rarity-common-light: #a9b4c2;
-  --rarity-common-dark: #5f6b7a;
-  --rarity-common-border: #8a94a3;
-
-  --rarity-rare-light: #ffb066;
-  --rarity-rare-dark: #c9560a;
-  --rarity-rare-border: #ff8f3c;
-
-  --rarity-epic-light: #d9a6ff;
-  --rarity-epic-dark: #7b2fb5;
-  --rarity-epic-border: #b46be0;
-
-  --rarity-legendary-light: #ffe08a;
-  --rarity-legendary-dark: #ff6ec7;
-  --rarity-legendary-border: #ffd54f;
-
-  /* Text on dark backgrounds */
-  --text-on-dark: #efe7ff;
-  --text-on-dark-dim: #9c97c9;
-  --text-on-cauldron: #eafff0;
-  --text-on-cauldron-dim: #9fd6ab;
-
-  /* Error accent */
-  --error: #ff9a9a;
-
-  --font-display: 'Baloo 2', system-ui, sans-serif;
-  --font-body: 'Nunito Sans', system-ui, sans-serif;
+  --ease-magic: cubic-bezier(0.7, 0, 0.2, 1);
+  --radius-card: 10px;
 }

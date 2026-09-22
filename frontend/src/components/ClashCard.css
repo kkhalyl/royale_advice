@@ -1,0 +1,132 @@
+.cc {
+  --w: 92px;
+  --rim: var(--r-common);
+  margin: 0;
+  width: var(--w);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.cc--sm {
+  --w: 64px;
+}
+.cc--lg {
+  --w: 116px;
+}
+
+.cc--rare {
+  --rim: var(--r-rare);
+}
+.cc--epic {
+  --rim: var(--r-epic);
+}
+.cc--legendary {
+  --rim: var(--r-legendary);
+}
+.cc--champion {
+  --rim: var(--r-champion);
+}
+
+.cc__frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 5 / 6;
+  padding: 3px;
+  border-radius: var(--radius-card);
+  background: var(--rim);
+  box-shadow: 0 0 0 2px var(--ink), 0 4px 0 2px var(--ink);
+}
+
+.cc__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: calc(var(--radius-card) - 3px);
+  background: radial-gradient(circle at 50% 35%, #3d5ea8, #172b5c);
+}
+
+.cc--evo .cc__frame {
+  box-shadow: 0 0 0 2px var(--ink), 0 4px 0 2px var(--ink), 0 0 18px 2px var(--brew);
+}
+
+.cc__elixir {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 26px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding-top: 4px;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background: radial-gradient(circle at 35% 30%, #ffb6ff, var(--elixir) 55%, #8a1b9b);
+  border: 2px solid var(--ink);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #fff;
+  -webkit-text-stroke: 1px var(--ink);
+  paint-order: stroke fill;
+}
+
+.cc--sm .cc__elixir {
+  width: 20px;
+  height: 23px;
+  font-size: 0.75rem;
+  top: -6px;
+  left: -6px;
+}
+
+.cc__level {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--royal-deep);
+  border: 2px solid var(--ink);
+  color: #fff;
+  white-space: nowrap;
+}
+
+.cc--sm .cc__level {
+  font-size: 0.68rem;
+  padding: 2px 6px;
+}
+
+/* Revelação: a carta vira do verso para a frente */
+.cc--reveal .cc__frame {
+  animation: cc-flip 0.7s var(--ease-magic) both;
+  animation-delay: var(--delay, 0ms);
+}
+.cc--reveal .cc__level {
+  animation: cc-fade 0.4s ease both;
+  animation-delay: calc(var(--delay, 0ms) + 450ms);
+}
+
+@keyframes cc-flip {
+  0% {
+    transform: perspective(600px) rotateY(180deg) scale(0.6);
+    filter: brightness(0) drop-shadow(0 0 12px var(--brew));
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: perspective(600px) rotateY(0) scale(1);
+    filter: none;
+  }
+}
+
+@keyframes cc-fade {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}

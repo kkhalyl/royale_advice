@@ -2,10 +2,23 @@
 
 from fastapi import APIRouter, HTTPException
 from app.clients import get_client, RoyaleAPIError
+from app.db.entities import Card as CardEntity
 from app.db.repositories import card_repo
 from app.models import Card, CardCatalogResponse
 
 router = APIRouter(prefix="/cards", tags=["cards"])
+
+
+def _to_card_model(entity: CardEntity) -> Card:
+    return Card(
+        id=entity.id,
+        name=entity.name,
+        elixir=entity.elixir,
+        rarity=entity.rarity,
+        type=entity.type,
+        icon_url=entity.icon_url,
+        max_evolution_level=entity.max_evolution_level,
+    )
 
 
 @router.get("/", response_model=CardCatalogResponse)
@@ -26,10 +39,7 @@ async def get_all_cards():
     except RoyaleAPIError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    cards = [
-        Card(id=c.id, name=c.name, elixir=c.elixir, rarity=c.rarity, type=c.type, icon_url=c.icon_url)
-        for c in card_repo.get_all_cards()
-    ]
+    cards = [_to_card_model(c) for c in card_repo.get_all_cards()]
 
     return CardCatalogResponse(total=len(cards), cards=cards)
 
@@ -49,6 +59,4 @@ async def get_card_by_id(card_id: int):
     if card is None:
         raise HTTPException(status_code=404, detail=f"Card {card_id} not found in catalog.")
 
-    return Card(
-        id=card.id, name=card.name, elixir=card.elixir, rarity=card.rarity, type=card.type, icon_url=card.icon_url
-    )
+    return _to_card_model(card)

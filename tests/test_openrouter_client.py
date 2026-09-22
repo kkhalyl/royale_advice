@@ -37,6 +37,31 @@ async def test_call_model_returns_none_when_no_choices():
 
 
 @pytest.mark.asyncio
+async def test_call_model_excludes_reasoning_by_default():
+    """Some free reasoning models (e.g. Nemotron) leak raw chain-of-thought
+    into message.content unless OpenRouter's reasoning.exclude flag is set -
+    this must be sent by default on every call."""
+    mock_client = AsyncMock()
+    mock_client.chat.completions.create = AsyncMock(return_value=_fake_response("resposta limpa"))
+
+    await call_model(mock_client, "some/model", [])
+
+    kwargs = mock_client.chat.completions.create.call_args.kwargs
+    assert kwargs["extra_body"] == {"reasoning": {"exclude": True}}
+
+
+@pytest.mark.asyncio
+async def test_call_model_caller_can_override_extra_body():
+    mock_client = AsyncMock()
+    mock_client.chat.completions.create = AsyncMock(return_value=_fake_response("ok"))
+
+    await call_model(mock_client, "some/model", [], extra_body={"custom": True})
+
+    kwargs = mock_client.chat.completions.create.call_args.kwargs
+    assert kwargs["extra_body"] == {"custom": True}
+
+
+@pytest.mark.asyncio
 async def test_try_models_applies_default_transform(monkeypatch):
     monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_primary_model", "primary/model")
     monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_fallback_model", "")

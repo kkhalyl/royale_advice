@@ -168,6 +168,52 @@ class TestSwapSuggestionsWithRedditTips:
         assert all(s.source == "rule_based" for s in suggestions)
 
 
+class TestEvolutionTip:
+    """AdviceEngine._evolution_tip - flags evolution slots available but not equipped."""
+
+    def test_flags_unused_evolution_slot(self):
+        cards = [
+            Card(id=1, name="Knight", elixir=3, rarity="Common", type="troop",
+                 max_evolution_level=3, evolution_level=None),
+        ]
+        tips = AdviceEngine._evolution_tip(cards)
+        assert len(tips) == 1
+        assert "Knight" in tips[0].text
+        assert tips[0].source == "rule_based"
+
+    def test_no_tip_when_evolution_already_equipped(self):
+        cards = [
+            Card(id=1, name="Knight", elixir=3, rarity="Common", type="troop",
+                 max_evolution_level=3, evolution_level=1),
+        ]
+        assert AdviceEngine._evolution_tip(cards) == []
+
+    def test_no_tip_when_card_has_no_evolution_available(self):
+        cards = [
+            Card(id=1, name="Electro Giant", elixir=7, rarity="Epic", type="troop",
+                 max_evolution_level=None, evolution_level=None),
+        ]
+        assert AdviceEngine._evolution_tip(cards) == []
+
+    def test_lists_multiple_unused_evolutions_in_one_tip(self):
+        cards = [
+            Card(id=1, name="Knight", elixir=3, rarity="Common", type="troop", max_evolution_level=3),
+            Card(id=2, name="Skeletons", elixir=1, rarity="Common", type="troop", max_evolution_level=1),
+        ]
+        tips = AdviceEngine._evolution_tip(cards)
+        assert len(tips) == 1
+        assert "Knight" in tips[0].text
+        assert "Skeletons" in tips[0].text
+
+    def test_evolution_tip_surfaces_in_swap_suggestions(self, sample_cards):
+        evolved_deck = sample_cards + [
+            Card(id=99, name="Knight", elixir=3, rarity="Common", type="troop", max_evolution_level=3),
+        ]
+        analysis = _analysis(issue_codes=[])
+        suggestions = AdviceEngine.generate_swap_suggestions(evolved_deck, analysis)
+        assert any("evolução" in s.text.lower() for s in suggestions)
+
+
 class TestGeneralTips:
     def test_low_elixir_gets_fast_cycle_tip(self):
         analysis = _analysis(avg_elixir=2.8)

@@ -11,9 +11,15 @@ class Card(BaseModel):
     id: int
     name: str
     elixir: int
-    rarity: str
+    rarity: str  # "common" | "rare" | "epic" | "legendary" | "champion"
     type: str  # "troop", "spell", "building"
     icon_url: Optional[str] = None
+    # Catalog-level: whether this card has an evolution at all (0/None = no).
+    max_evolution_level: Optional[int] = None
+    # Deck-slot-level: only set when this Card represents a specific player's
+    # equipped deck slot, and only present at all if the API considers the
+    # slot evolved (0/None = equipped but not evolved, or not applicable).
+    evolution_level: Optional[int] = None
 
 
 class DeckCard(BaseModel):
@@ -38,6 +44,7 @@ class PlayerSummary(BaseModel):
     draws: int
     king_level: Optional[int] = None
     current_deck: List[Card]  # Cards in current deck
+    support_card: Optional[Card] = None  # Tower Troop, if one is equipped
 
 
 class BattleStats(BaseModel):
@@ -91,6 +98,7 @@ class PlayerDeckView(BaseModel):
     cards: List[Card]
     avg_elixir: float
     card_count: int
+    support_card: Optional[Card] = None  # Tower Troop, if one is equipped
 
 
 class AskRequest(BaseModel):

@@ -39,6 +39,27 @@ class AdviceEngine:
         ]
 
     @staticmethod
+    def _evolution_tip(cards: List[Card]) -> List[TipDetail]:
+        """Flag deck slots that have an evolution available but aren't
+        currently equipped with it. Evolutions meaningfully buff a card for
+        free (no extra elixir cost), so an unused slot is concrete,
+        actionable, deck-specific feedback - not a generic rule."""
+        unused = [
+            card.name
+            for card in cards
+            if (card.max_evolution_level or 0) > 0 and not (card.evolution_level or 0) > 0
+        ]
+        if not unused:
+            return []
+
+        names = ", ".join(unused)
+        return [TipDetail(
+            text=f"Você tem evolução disponível para {names} mas não está usando - evolua essas "
+                 "cartas para um empurrão extra de poder sem gastar elixir a mais.",
+            source="rule_based",
+        )]
+
+    @staticmethod
     def generate_swap_suggestions(
         cards: List[Card],
         analysis: DeckAnalysis,
@@ -105,6 +126,10 @@ class AdviceEngine:
                 text="Diversifique a raridade das cartas para ter trocas mais equilibradas de nível e não sofrer tanto contra counters upados.",
                 source="rule_based",
             ))
+
+        # === Evolution suggestions (deck-specific, not from flagged issues) ===
+
+        rule_based.extend(AdviceEngine._evolution_tip(cards))
 
         # === Archetype-specific suggestions ===
 

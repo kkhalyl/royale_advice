@@ -42,6 +42,26 @@ def test_get_card_by_id_missing_returns_none(test_engine):
     assert card_repo.get_card_by_id(999) is None
 
 
+def test_upsert_cards_persists_max_evolution_level(test_engine):
+    raw = [{"id": 26000000, "name": "Knight", "elixirCost": 3, "rarity": "Common", "maxEvolutionLevel": 3}]
+    card_repo.upsert_cards(raw)
+    knight = card_repo.get_card_by_name("Knight")
+    assert knight.max_evolution_level == 3
+
+
+def test_upsert_cards_max_evolution_level_none_when_absent(test_engine):
+    card_repo.upsert_cards(RAW_CARDS)  # no maxEvolutionLevel key
+    knight = card_repo.get_card_by_name("Knight")
+    assert knight.max_evolution_level is None
+
+
+def test_upsert_cards_persists_champion_rarity(test_engine):
+    raw = [{"id": 26000065, "name": "Mighty Miner", "elixirCost": 4, "rarity": "champion"}]
+    card_repo.upsert_cards(raw)
+    card = card_repo.get_card_by_name("Mighty Miner")
+    assert card.rarity == "champion"
+
+
 def test_is_catalog_stale_when_empty(test_engine):
     assert card_repo.is_catalog_stale(timedelta(hours=24)) is True
 

@@ -12,9 +12,10 @@ class Card(SQLModel, table=True):
     id: int = Field(primary_key=True)
     name: str = Field(index=True)
     elixir: int
-    rarity: str
+    rarity: str  # "common" | "rare" | "epic" | "legendary" | "champion"
     type: str  # "troop", "spell", "building"
     icon_url: Optional[str] = None
+    max_evolution_level: Optional[int] = None  # None/0 = no evolution exists for this card
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 

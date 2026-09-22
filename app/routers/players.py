@@ -1,5 +1,7 @@
 """Player-related API endpoints."""
 
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException, Query
 from app.clients import get_client, RoyaleAPIError
 from app.config import settings
@@ -21,46 +23,77 @@ from app.db.repositories import card_repo, player_repo, battle_repo
 router = APIRouter(prefix="/players", tags=["players"])
 
 
+def _enrich_card(card_data: dict, cards_db: dict) -> Card:
+    """Build a Card from one currentDeck/currentDeckSupportCards entry,
+    enriched with the persisted card catalog (elixir, type, evolution info)."""
+    card_id = str(card_data.get("id", 0))
+    # Look up in database for elixir and type
+    db_card = cards_db.get(card_id, {})
+    card_name = card_data.get("name", db_card.get("name", "Unknown"))
+
+    # Prefer the persisted card catalog's type; it's set once at ingest
+    # time (see card_repo._infer_type) instead of being re-derived from
+    # role-guessing on every request.
+    persisted_card = card_repo.get_card_by_name(card_name)
+    if persisted_card:
+        card_type = persisted_card.type
+    else:
+        role = DeckAnalyzer.get_primary_role(card_name)
+        if role == "spell":
+            card_type = "spell"
+        elif role == "building":
+            card_type = "building"
+        else:
+            card_type = "troop"
+
+    # Prefer the catalog's icon, but fall back to the deck-slot entry's own
+    # iconUrls - Tower Troops (currentDeckSupportCards) aren't part of the
+    # regular /cards catalog, so this is their only source of art.
+    icon_url = (
+        (db_card.get("iconUrls") or {}).get("medium")
+        or (card_data.get("iconUrls") or {}).get("medium")
+        or (persisted_card.icon_url if persisted_card else None)
+    )
+    # The deck-slot entry itself carries maxEvolutionLevel on the real API
+    # (most specific/freshest source); fall back to the card catalog, then
+    # the persisted catalog row.
+    max_evolution_level = card_data.get("maxEvolutionLevel")
+    if max_evolution_level is None:
+        max_evolution_level = db_card.get("maxEvolutionLevel")
+    if max_evolution_level is None and persisted_card:
+        max_evolution_level = persisted_card.max_evolution_level
+
+    return Card(
+        id=int(card_id),
+        name=card_name,
+        elixir=db_card.get("elixirCost", card_data.get("elixirCost", 0)),
+        rarity=card_data.get("rarity", db_card.get("rarity", "Common")),
+        type=card_type,
+        icon_url=icon_url,
+        max_evolution_level=max_evolution_level,
+        # Only present on currentDeck entries, and only when that slot is
+        # actually evolved - absent (None) means "not evolved" here, not
+        # "unknown".
+        evolution_level=card_data.get("evolutionLevel"),
+    )
+
+
 async def _get_enriched_deck(player_data: dict, client) -> list[Card]:
     """Helper to extract deck from player data and enrich with card database (elixir, type)."""
     cards_db = await client.get_cards()
-    deck = []
 
     # Note: currentDeck might not include all 8 cards due to API sync delays
     # See: https://github.com/RoyaleAPI/cr-api-docs/issues for known sync issues
-    for card_data in player_data.get("currentDeck", []):
-        card_id = str(card_data.get("id", 0))
-        # Look up in database for elixir and type
-        db_card = cards_db.get(card_id, {})
-        card_name = card_data.get("name", db_card.get("name", "Unknown"))
+    return [_enrich_card(card_data, cards_db) for card_data in player_data.get("currentDeck", [])]
 
-        # Prefer the persisted card catalog's type; it's set once at ingest
-        # time (see card_repo._infer_type) instead of being re-derived from
-        # role-guessing on every request.
-        persisted_card = card_repo.get_card_by_name(card_name)
-        if persisted_card:
-            card_type = persisted_card.type
-        else:
-            role = DeckAnalyzer.get_primary_role(card_name)
-            if role == "spell":
-                card_type = "spell"
-            elif role == "building":
-                card_type = "building"
-            else:
-                card_type = "troop"
 
-        icon_url = (db_card.get("iconUrls") or {}).get("medium") or (persisted_card.icon_url if persisted_card else None)
-
-        card = Card(
-            id=int(card_id),
-            name=card_name,
-            elixir=db_card.get("elixirCost", card_data.get("elixirCost", 0)),
-            rarity=card_data.get("rarity", db_card.get("rarity", "Common")),
-            type=card_type,
-            icon_url=icon_url,
-        )
-        deck.append(card)
-    return deck
+async def _get_support_card(player_data: dict, client) -> Optional[Card]:
+    """The Tower Troop slot, if one is equipped (currentDeckSupportCards)."""
+    support_list = player_data.get("currentDeckSupportCards") or []
+    if not support_list:
+        return None
+    cards_db = await client.get_cards()
+    return _enrich_card(support_list[0], cards_db)
 
 
 def _persist_player(player_data: dict, fallback_tag: str) -> str:
@@ -103,6 +136,7 @@ async def get_player(tag: str):
 
     # Extract and enrich deck cards
     deck = await _get_enriched_deck(player_data, client)
+    support_card = await _get_support_card(player_data, client)
 
     return PlayerSummary(
         tag=player_data.get("tag", tag),
@@ -114,6 +148,7 @@ async def get_player(tag: str):
         draws=player_data.get("draws", 0),
         king_level=player_data.get("expLevel"),
         current_deck=deck,
+        support_card=support_card,
     )
 
 
@@ -163,6 +198,7 @@ async def get_player_deck(tag: str):
 
     # Extract and enrich deck
     deck = await _get_enriched_deck(player_data, client)
+    support_card = await _get_support_card(player_data, client)
 
     avg_elixir = DeckAnalyzer.calculate_avg_elixir(deck)
 
@@ -172,6 +208,7 @@ async def get_player_deck(tag: str):
         cards=deck,
         avg_elixir=avg_elixir,
         card_count=len(deck),
+        support_card=support_card,
     )
 
 

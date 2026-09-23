@@ -17,7 +17,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.clients import get_client, RoyaleAPIError
-from app.clients.openrouter_client import build_client, try_models
+from app.clients.llm_client import has_llm_provider, try_models
 from app.routers.players import _persist_player
 
 logger = logging.getLogger(__name__)
@@ -123,25 +123,24 @@ async def witch_chat(request: WitchChatRequest):
     """
     Conversational LLM endpoint: builds a system prompt from `mode` +
     `player` context and forwards the full message history (multi-turn,
-    unlike /players/{tag}/ask's single-shot design) to OpenRouter.
+    unlike /players/{tag}/ask's single-shot design) to Gemini.
 
     Always returns application/json {"reply": "..."} - the frontend also
     accepts a streaming response, but a plain JSON reply is fully
     compatible (askWitch() branches on content-type, and the UI animates
     the reply client-side via useTypewriter regardless of how it arrived).
     """
-    client = build_client()
-    if client is None:
+    if not has_llm_provider():
         raise HTTPException(
             status_code=400,
-            detail="A bruxa está em silêncio hoje - OPENROUTER_API_KEY não configurada.",
+            detail="A bruxa está em silêncio hoje - GEMINI_API_KEY/GROQ_API_KEY não configuradas.",
         )
 
     messages = [{"role": "system", "content": _build_system_prompt(request.mode, request.player)}]
     messages.extend({"role": m.role, "content": m.content} for m in request.messages)
 
     reply = await try_models(
-        client, messages, transform=_reject_leaked_reasoning, max_tokens=700, temperature=0.8
+        messages, transform=_reject_leaked_reasoning, max_tokens=700, temperature=0.8
     )
     if reply is None:
         raise HTTPException(

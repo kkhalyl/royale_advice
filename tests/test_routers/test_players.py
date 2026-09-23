@@ -191,14 +191,16 @@ class TestAskWitch:
     """POST /players/{tag}/ask - stateless free-text question endpoint."""
 
     def test_ask_without_api_key_returns_400(self, monkeypatch):
-        monkeypatch.setattr("app.routers.players.settings.openrouter_api_key", "")
+        monkeypatch.setattr("app.clients.llm_client.settings.gemini_api_key", "")
+        monkeypatch.setattr("app.clients.llm_client.settings.groq_api_key", "")
         response = client.post("/players/2PP/ask", json={"question": "Como jogo contra Golem?"})
         assert response.status_code == 400
 
     def test_ask_returns_answer_when_configured(self, monkeypatch):
-        monkeypatch.setattr("app.routers.players.settings.openrouter_api_key", "test-key")
-        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_primary_model", "primary/model")
-        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_fallback_model", "")
+        monkeypatch.setattr("app.clients.llm_client.settings.gemini_api_key", "test-key")
+        monkeypatch.setattr("app.clients.llm_client.settings.llm_primary_model", "primary/model")
+        monkeypatch.setattr("app.clients.llm_client.settings.llm_fallback_model", "")
+        monkeypatch.setattr("app.clients.llm_client.settings.groq_api_key", "")
 
         message = SimpleNamespace(content="Segure o Cavaleiro e contra-ataque com o Porco.")
         choice = SimpleNamespace(message=message)
@@ -214,9 +216,10 @@ class TestAskWitch:
         assert response.json()["answer"] == "Segure o Cavaleiro e contra-ataque com o Porco."
 
     def test_ask_returns_400_when_model_fails(self, monkeypatch):
-        monkeypatch.setattr("app.routers.players.settings.openrouter_api_key", "test-key")
-        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_primary_model", "primary/model")
-        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_fallback_model", "")
+        monkeypatch.setattr("app.clients.llm_client.settings.gemini_api_key", "test-key")
+        monkeypatch.setattr("app.clients.llm_client.settings.llm_primary_model", "primary/model")
+        monkeypatch.setattr("app.clients.llm_client.settings.llm_fallback_model", "")
+        monkeypatch.setattr("app.clients.llm_client.settings.groq_api_key", "")
 
         mock_client = AsyncMock()
         mock_client.chat.completions.create = AsyncMock(side_effect=Exception("boom"))

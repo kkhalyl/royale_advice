@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from app.clients.openrouter_client import build_client, try_models
+from app.clients.llm_client import has_llm_provider, try_models
 
 logger = logging.getLogger(__name__)
 
@@ -75,8 +75,7 @@ async def summarize_sources(
     if not sources:
         return None
 
-    client = build_client()
-    if client is None:
+    if not has_llm_provider():
         return None
 
     messages = [
@@ -84,7 +83,7 @@ async def summarize_sources(
         {"role": "user", "content": _build_prompt(subject_type, subject_key, sources)},
     ]
 
-    text = await try_models(client, messages, transform=_accept, max_tokens=300, temperature=0.4)
+    text = await try_models(messages, transform=_accept, max_tokens=300, temperature=0.4)
     if not text:
         return None
 

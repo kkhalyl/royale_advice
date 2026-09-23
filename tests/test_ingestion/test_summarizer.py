@@ -1,4 +1,4 @@
-"""Unit tests for ingestion/summarizer.py - mocks the OpenRouter client, no network."""
+"""Unit tests for ingestion/summarizer.py - mocks the LLM client, no network."""
 
 from datetime import datetime
 from types import SimpleNamespace
@@ -28,16 +28,18 @@ async def test_returns_none_for_empty_sources():
 
 @pytest.mark.asyncio
 async def test_returns_none_without_api_key(monkeypatch):
-    monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_api_key", "")
+    monkeypatch.setattr("app.clients.llm_client.settings.gemini_api_key", "")
+    monkeypatch.setattr("app.clients.llm_client.settings.groq_api_key", "")
     result = await summarize_sources("card", "Hog Rider", SOURCES)
     assert result is None
 
 
 @pytest.mark.asyncio
 async def test_returns_structured_tip_dict(monkeypatch):
-    monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_api_key", "test-key")
-    monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_primary_model", "primary/model")
-    monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_fallback_model", "")
+    monkeypatch.setattr("app.clients.llm_client.settings.gemini_api_key", "test-key")
+    monkeypatch.setattr("app.clients.llm_client.settings.llm_primary_model", "primary/model")
+    monkeypatch.setattr("app.clients.llm_client.settings.llm_fallback_model", "")
+    monkeypatch.setattr("app.clients.llm_client.settings.groq_api_key", "")
 
     mock_client = AsyncMock()
     mock_client.chat.completions.create = AsyncMock(
@@ -58,9 +60,10 @@ async def test_returns_structured_tip_dict(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_returns_none_when_model_reports_no_useful_content(monkeypatch):
-    monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_api_key", "test-key")
-    monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_primary_model", "primary/model")
-    monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_fallback_model", "")
+    monkeypatch.setattr("app.clients.llm_client.settings.gemini_api_key", "test-key")
+    monkeypatch.setattr("app.clients.llm_client.settings.llm_primary_model", "primary/model")
+    monkeypatch.setattr("app.clients.llm_client.settings.llm_fallback_model", "")
+    monkeypatch.setattr("app.clients.llm_client.settings.groq_api_key", "")
 
     mock_client = AsyncMock()
     mock_client.chat.completions.create = AsyncMock(return_value=_fake_response(NO_USEFUL_CONTENT))
@@ -73,9 +76,10 @@ async def test_returns_none_when_model_reports_no_useful_content(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_king_level_range_passed_through(monkeypatch):
-    monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_api_key", "test-key")
-    monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_primary_model", "primary/model")
-    monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_fallback_model", "")
+    monkeypatch.setattr("app.clients.llm_client.settings.gemini_api_key", "test-key")
+    monkeypatch.setattr("app.clients.llm_client.settings.llm_primary_model", "primary/model")
+    monkeypatch.setattr("app.clients.llm_client.settings.llm_fallback_model", "")
+    monkeypatch.setattr("app.clients.llm_client.settings.groq_api_key", "")
 
     mock_client = AsyncMock()
     mock_client.chat.completions.create = AsyncMock(return_value=_fake_response("Dica de nivel."))

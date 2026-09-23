@@ -1,18 +1,60 @@
-# Royal Advice — Clash Royale Player Advice API
+# ⚔️ Royal Advice — Clash Royale Player Advice API
 
-A **Python FastAPI backend** that fetches player/deck/battle data from the Clash Royale API via the **RoyaleAPI proxy**, persists it in SQLite, and generates **gameplay improvement advice** by combining rule-based deck analysis, Reddit-sourced community tips, and an optional LLM-powered summary. A "witch's tavern" React frontend is specced (see `specs/frontend-app/`) but not yet implemented.
+A **Python FastAPI backend** + **React frontend** that analyzes Clash Royale player decks and generates personalized gameplay advice. Combines rule-based analysis, Reddit-mined community tips, and LLM-powered coaching via **Gemini** (primary) / **Groq** (fallback).
 
-## Features
+## ✨ Features
 
-- **Player Profile Lookup** — Fetch player stats, trophies, king level, clan, and current deck; persisted on every fetch
-- **Deck Analysis** — Archetype classification (cycle, beatdown, control, siege), structured issue/strength codes (not hardcoded strings)
-- **Rule-Based + Reddit-Sourced Advice** — Suggested swaps and tips combine deterministic rules with community tips mined from Reddit (once the ingestion pipeline has run), each tagged with its `source`
-- **Win Rate & Battle Stats** — Computed from persisted battlelog history
-- **Ask the Witch** — A stateless, single-question LLM endpoint (no conversation history)
-- **LLM Summary** — Optional OpenRouter-powered personalized coaching (feature-flagged)
-- **Persisted Card Catalog** — SQLite-backed, refreshed on a TTL (survives restarts, unlike a plain in-memory cache)
+- 🎯 **Player Profile Lookup** — Fetch player stats, trophies, king level, clan, and current deck (persisted)
+- 🎴 **Deck Analysis** — Archetype classification (cycle, beatdown, control, siege) with structured issue/strength codes
+- 💬 **Reddit-Sourced Advice** — Tips from `r/ClashRoyale`, `r/ClashRoyaleDecks`, `r/CompetitiveClashRoyale`, summarized by LLM
+- 📊 **Win Rate & Battle Stats** — Computed from persisted battlelog history
+- 🧙 **Ask the Witch** — Stateless LLM Q&A endpoint for deck questions
+- 🎓 **LLM Summary** — Optional Gemini-powered personalized coaching (Groq fallback if Gemini fails)
+- 💾 **Persisted Cache** — SQLite-backed card catalog with TTL refresh (survives restarts)
 
-## Quick Start
+## 📦 Deployment
+
+| Target | Instructions | Time |
+|--------|--------------|------|
+| **Frontend to Vercel** | `git push origin main` → see `frontend/README.md` | 2 min |
+| **Backend to Railway/Render** | Connect GitHub repo, set `.env` vars in dashboard | 5 min |
+
+⚠️ **Important:** Deploy **frontend only** to Vercel (static build). Backend needs separate Python-capable hosting (Railway, Render, Fly.io).
+
+---
+
+## 🛠️ Tech Stack
+
+| Component | Stack |
+|-----------|-------|
+| **Backend** | Python 3.11, FastAPI, SQLModel, SQLite |
+| **Frontend** | React 18, TypeScript, Vite, React Router |
+| **LLM** | Gemini 3.1 Flash (primary) / Groq (fallback) |
+| **Data** | RoyaleAPI proxy, Reddit PRAW, SQLite persistence |
+| **Deploy** | Vercel (frontend), Railway/Render/Fly.io (backend) |
+
+---
+
+## 🚀 Quick Start (Local Development)
+
+### Option A: Run both backend + frontend locally (Windows)
+
+**Backend:**
+```bash
+run-backend.bat  # or: .venv\Scripts\activate && python -m uvicorn app.main:app --reload
+```
+
+**Frontend** (separate terminal):
+```bash
+cd frontend
+run-frontend.bat  # or: npm install && npm run dev
+```
+
+Backend at `http://localhost:8000`, frontend at `http://localhost:5173`.
+
+---
+
+### Option B: Manual setup
 
 ### 1. Set Up a Virtual Environment
 
@@ -39,23 +81,33 @@ cp .env.example .env
 
 Edit `.env`:
 - `ROYALE_API_KEY` / `ROYALE_API_BASE` — required, from your RoyaleAPI dashboard
-- `OPENROUTER_API_KEY` (+ `OPENROUTER_PRIMARY_MODEL` / `OPENROUTER_FALLBACK_MODEL`) — optional, enables the LLM summary and the `/ask` endpoint
+- `GEMINI_API_KEY` (+ `LLM_PRIMARY_MODEL` / `LLM_FALLBACK_MODEL`) — optional, primary LLM provider; enables the LLM summary, `/ask`, and the witch chat
+- `GROQ_API_KEY` (+ `GROQ_FALLBACK_MODEL`) — optional, used as a fallback when Gemini fails or is rate-limited
 - `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` / `REDDIT_USER_AGENT` — optional, only needed to run the Reddit ingestion pipeline (`ingestion/run.py`), not the API server itself
 - `DATABASE_URL` — optional, defaults to `sqlite:///./data/royal_advice.db` (created automatically)
 
 **Important:** You must have added `45.79.218.79` to **ALLOWED IP ADDRESSES** in your RoyaleAPI dashboard before running.
 
-### 4. Run the Server
+### 4. Run the Backend
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-Server starts at `http://localhost:8000`; the SQLite DB is created automatically on startup.
+Server starts at `http://localhost:8000`; the SQLite DB is created automatically on startup. Swagger UI: http://localhost:8000/docs
 
-### 5. Explore the API
+### 5. Run the Frontend
 
-Visit **Swagger UI:** http://localhost:8000/docs
+In a separate terminal:
+
+```bash
+cd frontend
+npm install    # first time only
+cp .env.example .env   # first time only; VITE_API_URL defaults to http://localhost:8000
+npm run dev
+```
+
+Opens at `http://localhost:5173`. Needs the backend (step 4) running at the same time — see `frontend/README.md` for the full flow and backend contract.
 
 ## API Endpoints
 
@@ -96,7 +148,7 @@ curl "http://localhost:8000/players/2PP/advice"
     {"text": "Adicione defesa aérea (Dragão Infernal, Caçador...).", "source": "rule_based"}
   ],
   "general_tips": [{"text": "Seu deck e rapido--cicle bem...", "source": "rule_based"}],
-  "llm_summary": "(optional, present only if OPENROUTER_API_KEY is set)"
+  "llm_summary": "(optional, present only if GEMINI_API_KEY is set)"
 }
 ```
 
@@ -144,7 +196,7 @@ python -m ingestion.run --target levels
 python -m ingestion.run --target all
 ```
 
-Requires `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET` and `OPENROUTER_API_KEY` in `.env`. Re-run periodically (manually, or via Windows Task Scheduler) — tips carry a `stale_after` timestamp so old advice stops being served without needing an active cleanup job.
+Requires `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET` and `GEMINI_API_KEY` in `.env`. Re-run periodically (manually, or via Windows Task Scheduler) — tips carry a `stale_after` timestamp so old advice stops being served without needing an active cleanup job.
 
 ## Testing
 
@@ -152,7 +204,7 @@ Requires `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET` and `OPENROUTER_API_KEY` in `
 pytest
 ```
 
-All tests mock external services — **no live Reddit/RoyaleAPI/OpenRouter calls**, and DB tests use isolated in-memory SQLite (never the real `data/royal_advice.db`). Structure: `tests/test_*.py` for individual modules, `tests/test_db/` for repositories, `tests/test_ingestion/` for the Reddit pipeline, `tests/test_routers/` for endpoint-level tests via `TestClient`.
+All tests mock external services — **no live Reddit/RoyaleAPI/Gemini calls**, and DB tests use isolated in-memory SQLite (never the real `data/royal_advice.db`). Structure: `tests/test_*.py` for individual modules, `tests/test_db/` for repositories, `tests/test_ingestion/` for the Reddit pipeline, `tests/test_routers/` for endpoint-level tests via `TestClient`.
 
 ## Project Structure
 
@@ -165,7 +217,7 @@ royal-advice/
 │   ├── config.py                  # Settings from environment
 │   ├── models.py                  # Pydantic API models
 │   ├── db/                        # SQLModel entities + repositories
-│   ├── clients/                   # royale_client.py, openrouter_client.py (shared LLM client)
+│   ├── clients/                   # royale_client.py, llm_client.py (shared LLM client)
 │   ├── analysis/                  # deck_analyzer, advice_engine, llm_advisor, issue_codes
 │   ├── i18n/                      # pt-BR string templates
 │   └── routers/                   # players.py, cards.py
@@ -177,11 +229,11 @@ royal-advice/
 
 ## Optional: LLM-Powered Features
 
-If `OPENROUTER_API_KEY` is set, two features activate:
+If `GEMINI_API_KEY` is set, two features activate:
 1. `/players/{tag}/advice`'s `llm_summary` field — a short personalized coaching paragraph
 2. `/players/{tag}/ask` — the free-text Q&A endpoint
 
-Both use `app/clients/openrouter_client.py`'s shared client with primary/fallback model retry; without the key, the app works fully, just without these two features.
+Both use `app/clients/llm_client.py`'s shared client with primary/fallback model retry; without the key, the app works fully, just without these two features.
 
 ## Troubleshooting
 
@@ -192,7 +244,7 @@ Check `ROYALE_API_KEY` in `.env`, and that `45.79.218.79` is added to **ALLOWED 
 Verify the tag exists; tags work with or without a leading `#`.
 
 ### `POST /players/{tag}/ask` returns 400
-Either `OPENROUTER_API_KEY` isn't set, or every configured OpenRouter model failed — check server logs for the specific model error.
+Either `GEMINI_API_KEY` isn't set, or every configured Gemini model failed — check server logs for the specific model error.
 
 ### Tests Fail
 Run from the project root with the venv active: `pytest -v`. No live API calls are made; a failure means a real regression, not a network/credentials issue.

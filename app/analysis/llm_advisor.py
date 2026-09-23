@@ -1,8 +1,8 @@
-"""Optional LLM-powered advice generation (feature-flagged with OpenRouter)."""
+"""Optional LLM-powered advice generation (feature-flagged with Gemini)."""
 
 import logging
 from typing import List, Optional
-from app.clients.openrouter_client import build_client, try_models
+from app.clients.llm_client import has_llm_provider, try_models
 from app.models import DeckAnalysis, TipDetail
 
 logger = logging.getLogger(__name__)
@@ -78,11 +78,11 @@ async def generate_llm_summary(
     suggested_swaps: List[TipDetail],
 ) -> Optional[str]:
     """
-    Generate LLM-powered advice summary using OpenRouter (feature-flagged).
+    Generate LLM-powered advice summary using Gemini (feature-flagged).
 
-    If OPENROUTER_API_KEY is not set, returns None gracefully.
-    Tries settings.openrouter_primary_model first; if that call fails or
-    returns no usable text, retries once against settings.openrouter_fallback_model
+    If GEMINI_API_KEY is not set, returns None gracefully.
+    Tries settings.llm_primary_model first; if that call fails or
+    returns no usable text, retries once against settings.llm_fallback_model
     before giving up and returning None (never raises to the caller).
 
     Args:
@@ -94,8 +94,7 @@ async def generate_llm_summary(
     Returns:
         Optional LLM summary string, or None if feature disabled/failed
     """
-    client = build_client()
-    if client is None:
+    if not has_llm_provider():
         return None
 
     messages = [
@@ -103,7 +102,7 @@ async def generate_llm_summary(
         {"role": "user", "content": _build_user_prompt(player_name, trophies, analysis, suggested_swaps)},
     ]
 
-    summary = await try_models(client, messages, transform=_clean_summary, max_tokens=700, temperature=0.8)
+    summary = await try_models(messages, transform=_clean_summary, max_tokens=700, temperature=0.8)
     if summary:
         logger.info(f"Generated LLM summary in Portuguese for {player_name}.")
     else:
@@ -139,7 +138,7 @@ async def answer_question(
     Answer a single free-text question about a player's deck (stateless -
     no conversation history is kept or referenced between calls).
 
-    If OPENROUTER_API_KEY is not set, or every configured model fails,
+    If GEMINI_API_KEY is not set, or every configured model fails,
     returns None (the caller is responsible for surfacing this as an error
     to the user - this function never raises).
 
@@ -152,8 +151,7 @@ async def answer_question(
     Returns:
         Optional answer string, or None if the feature is disabled/failed
     """
-    client = build_client()
-    if client is None:
+    if not has_llm_provider():
         return None
 
     messages = [
@@ -161,4 +159,4 @@ async def answer_question(
         {"role": "user", "content": _build_ask_prompt(player_name, deck_card_names, analysis, question)},
     ]
 
-    return await try_models(client, messages, max_tokens=700, temperature=0.8)
+    return await try_models(messages, max_tokens=700, temperature=0.8)

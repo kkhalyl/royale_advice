@@ -14,6 +14,33 @@ npm run dev
 `VITE_API_URL` (`.env`) define a base do backend - `http://localhost:8000` em dev,
 já que o backend (FastAPI) roda numa porta separada da do Vite.
 
+## Deploy no Vercel
+
+1. **Fazer build local:**
+   ```bash
+   npm run build
+   ```
+   Gera `dist/` com o app estático pronto.
+
+2. **Conectar o repo ao Vercel:**
+   ```bash
+   npx vercel
+   ```
+   Ou via Dashboard: https://vercel.com/dashboard — conectar seu GitHub repo.
+
+3. **Configurar a variável de ambiente:**
+   - No Vercel Dashboard, vá para **Settings → Environment Variables**
+   - Adicione `VITE_API_URL` com a URL do seu backend (ex: `https://seu-backend.com` ou `https://seu-servidor.railway.app`)
+   - Vercel vai fazer build automaticamente com essa env
+
+4. **Deploy via Git:**
+   ```bash
+   git push origin main  # Vercel puxa automaticamente
+   ```
+   Ou manualmente: `npx vercel --prod`
+
+**Importante:** O backend (FastAPI) precisa estar hospedado em outro lugar (Railway, Fly.io, seu servidor, etc.) com CORS configurado. O frontend precisa acessá-lo via URL pública — não pode ser `http://localhost:8000`.
+
 ## Contrato do backend (implementado em `app/routers/frontend_api.py`)
 
 ### `GET /api/players/:tag`  (tag sem `#`)
@@ -33,7 +60,7 @@ O front aceita qualquer um destes formatos, mas o backend atual sempre devolve
 client-side (`useTypewriter`), então streaming real do backend não é necessário.
 
 Markdown simples (títulos `##`, listas, `**negrito**`) é renderizado no balão.
-O backend usa os modelos configurados em `OPENROUTER_PRIMARY_MODEL`/`_FALLBACK_MODEL`
+O backend usa os modelos configurados em `LLM_PRIMARY_MODEL`/`LLM_FALLBACK_MODEL`
 (veja `.env.example` na raiz do projeto) e rejeita respostas que parecem
 racionínio vazado em inglês, tentando o modelo de fallback automaticamente
 (veja `_reject_leaked_reasoning` em `frontend_api.py`).

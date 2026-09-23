@@ -68,7 +68,8 @@ class TestGetRawPlayer:
 
 class TestWitchChat:
     def test_returns_400_without_api_key(self, monkeypatch):
-        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_api_key", "")
+        monkeypatch.setattr("app.clients.llm_client.settings.gemini_api_key", "")
+        monkeypatch.setattr("app.clients.llm_client.settings.groq_api_key", "")
         response = client.post(
             "/api/witch/chat",
             json={"mode": "analise", "messages": [{"role": "user", "content": "oi"}], "player": {"name": "X"}},
@@ -76,9 +77,10 @@ class TestWitchChat:
         assert response.status_code == 400
 
     def test_returns_reply_json(self, monkeypatch):
-        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_api_key", "test-key")
-        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_primary_model", "primary/model")
-        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_fallback_model", "")
+        monkeypatch.setattr("app.clients.llm_client.settings.gemini_api_key", "test-key")
+        monkeypatch.setattr("app.clients.llm_client.settings.llm_primary_model", "primary/model")
+        monkeypatch.setattr("app.clients.llm_client.settings.llm_fallback_model", "")
+        monkeypatch.setattr("app.clients.llm_client.settings.groq_api_key", "")
 
         message = SimpleNamespace(content="Vejo cartas fortes no seu destino.")
         choice = SimpleNamespace(message=message)
@@ -108,9 +110,10 @@ class TestWitchChat:
         assert called_messages[1] == {"role": "user", "content": "Quero a poção de trocas."}
 
     def test_forwards_full_message_history(self, monkeypatch):
-        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_api_key", "test-key")
-        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_primary_model", "primary/model")
-        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_fallback_model", "")
+        monkeypatch.setattr("app.clients.llm_client.settings.gemini_api_key", "test-key")
+        monkeypatch.setattr("app.clients.llm_client.settings.llm_primary_model", "primary/model")
+        monkeypatch.setattr("app.clients.llm_client.settings.llm_fallback_model", "")
+        monkeypatch.setattr("app.clients.llm_client.settings.groq_api_key", "")
 
         message = SimpleNamespace(content="Resposta.")
         choice = SimpleNamespace(message=message)
@@ -137,9 +140,10 @@ class TestWitchChat:
         assert called_messages[1:] == history
 
     def test_returns_400_when_all_models_fail(self, monkeypatch):
-        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_api_key", "test-key")
-        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_primary_model", "primary/model")
-        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_fallback_model", "")
+        monkeypatch.setattr("app.clients.llm_client.settings.gemini_api_key", "test-key")
+        monkeypatch.setattr("app.clients.llm_client.settings.llm_primary_model", "primary/model")
+        monkeypatch.setattr("app.clients.llm_client.settings.llm_fallback_model", "")
+        monkeypatch.setattr("app.clients.llm_client.settings.groq_api_key", "")
 
         mock_client = AsyncMock()
         mock_client.chat.completions.create = AsyncMock(side_effect=Exception("boom"))
@@ -158,9 +162,10 @@ class TestWitchChat:
         endpoint's longer JSON-context prompt and emits raw English
         analysis prose instead. That must be rejected and retried against
         the fallback model, not shown to the user."""
-        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_api_key", "test-key")
-        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_primary_model", "primary/model")
-        monkeypatch.setattr("app.clients.openrouter_client.settings.openrouter_fallback_model", "fallback/model")
+        monkeypatch.setattr("app.clients.llm_client.settings.gemini_api_key", "test-key")
+        monkeypatch.setattr("app.clients.llm_client.settings.llm_primary_model", "primary/model")
+        monkeypatch.setattr("app.clients.llm_client.settings.llm_fallback_model", "fallback/model")
+        monkeypatch.setattr("app.clients.llm_client.settings.groq_api_key", "")
 
         leaked = SimpleNamespace(
             choices=[SimpleNamespace(message=SimpleNamespace(

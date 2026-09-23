@@ -4,7 +4,6 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from app.clients import get_client, RoyaleAPIError
-from app.config import settings
 from app.models import (
     PlayerSummary,
     DeckAnalysis,
@@ -18,6 +17,7 @@ from app.models import (
 from app.analysis.deck_analyzer import DeckAnalyzer
 from app.analysis.advice_engine import AdviceEngine
 from app.analysis.llm_advisor import generate_llm_summary, answer_question
+from app.clients.llm_client import has_llm_provider
 from app.db.repositories import card_repo, player_repo, battle_repo
 
 router = APIRouter(prefix="/players", tags=["players"])
@@ -344,14 +344,14 @@ async def ask_witch(tag: str, request: AskRequest):
         AskResponse with the witch's answer
 
     Raises:
-        HTTPException 400: if OPENROUTER_API_KEY isn't configured, the
+        HTTPException 400: if no LLM provider is configured, the
             player/deck can't be fetched, or every configured model failed
             to produce an answer
     """
-    if not settings.openrouter_api_key:
+    if not has_llm_provider():
         raise HTTPException(
             status_code=400,
-            detail="A bruxa está em silêncio hoje - OPENROUTER_API_KEY não configurada.",
+            detail="A bruxa está em silêncio hoje - GEMINI_API_KEY/GROQ_API_KEY não configuradas.",
         )
 
     client = get_client()

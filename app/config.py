@@ -8,9 +8,11 @@ class Settings(BaseSettings):
 
     royale_api_key: str = ""
     royale_api_base: str = "https://proxy.royaleapi.dev/v1"
-    openrouter_api_key: Optional[str] = None
-    openrouter_primary_model: str = "nvidia/nemotron-3-ultra-550b-a55b:free"
-    openrouter_fallback_model: str = "google/gemma-4-26b-a4b-it:free"
+    gemini_api_key: Optional[str] = None
+    llm_primary_model: str = "gemini-3.1-flash-lite"
+    llm_fallback_model: str = ""
+    groq_api_key: Optional[str] = None
+    groq_fallback_model: str = ""
     database_url: str = "sqlite:///./data/royal_advice.db"
     reddit_client_id: Optional[str] = None
     reddit_client_secret: Optional[str] = None

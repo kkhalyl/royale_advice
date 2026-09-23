@@ -3,7 +3,7 @@ uvicorn[standard]==0.30.6
 httpx==0.28.1
 python-dotenv==1.0.1
 pydantic-settings==2.10.1
-pydantic==2.11.7
+pydantic>=2.11,<3.0
 openai==1.109.1
 sqlmodel==0.0.22
 praw==7.7.1

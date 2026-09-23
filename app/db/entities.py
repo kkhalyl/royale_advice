@@ -9,7 +9,7 @@ from sqlmodel import Field, SQLModel
 class Card(SQLModel, table=True):
     """Full card catalog, refreshed periodically from the Royale API."""
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int = Field(primary_key=True)
     name: str = Field(index=True)
     elixir: int
     rarity: str  # "common" | "rare" | "epic" | "legendary" | "champion"
